@@ -6,7 +6,7 @@ from document_data_models import ExtendedOCRResponse
 from document_utils.cost_tracking import TokenUsageTracker
 
 
-class DocumentChunker(ABC):
+class BaseChunker(ABC):
     """
     Base class for document chunking strategies.
     Subclasses should implement the `chunk()` method to
