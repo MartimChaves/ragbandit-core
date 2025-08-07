@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
 from document_data_models import ExtendedOCRResponse
-from document_utils.cost_tracking import TokenUsageTracker
+from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
 class BaseChunker(ABC):
