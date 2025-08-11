@@ -21,16 +21,21 @@ class MistralOCRDocument(BaseOCR):
         self.client = Mistral(api_key=api_key)
         self.secure_handler = SecureFileHandler()
 
-    def process(self, pdf_filepath: str) -> OCRResponse:
+    def process(
+        self, pdf_filepath: str, encrypted: bool = True
+    ) -> OCRResponse:
         """Process a PDF file through Mistral's OCR API.
 
         Args:
             pdf_filepath: Path to the PDF file to process
+            encrypted: Whether the file is encrypted (default: True)
 
         Returns:
             OCRResponse: The OCR response from Mistral
         """
-        file_name, reader = self.validate_and_prepare_file(pdf_filepath)
+        file_name, reader = self.validate_and_prepare_file(
+                                pdf_filepath, encrypted
+                            )
 
         self.logger.info("Creating OCR...")
         uploaded_pdf = self.client.files.upload(
