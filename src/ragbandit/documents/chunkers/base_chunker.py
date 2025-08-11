@@ -1,8 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
 
-from document_data_models import ExtendedOCRResponse
+from ragbandit.schema import ExtendedOCRResponse
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
@@ -26,7 +25,7 @@ class BaseChunker(ABC):
         self,
         response: ExtendedOCRResponse,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, any]]:
         """
         Chunk the document content from an ExtendedOCRResponse.
 
@@ -45,8 +44,8 @@ class BaseChunker(ABC):
         raise NotImplementedError
 
     def merge_small_chunks(
-        self, chunks: List[Dict[str, Any]], min_size: int
-    ) -> List[Dict[str, Any]]:
+        self, chunks: list[dict[str, any]], min_size: int
+    ) -> list[dict[str, any]]:
         """
         Merge small chunks with adjacent chunks to ensure minimum chunk size.
 
@@ -125,8 +124,8 @@ class BaseChunker(ABC):
         return merged
 
     def process_chunks(
-        self, chunks: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, chunks: list[dict[str, any]]
+    ) -> list[dict[str, any]]:
         """
         Optional post-processing of chunks after initial chunking.
         This can be overridden by subclasses to
@@ -141,7 +140,7 @@ class BaseChunker(ABC):
         return chunks
 
     def extend_response(
-        self, response: ExtendedOCRResponse, chunks: List[Dict[str, Any]]
+        self, response: ExtendedOCRResponse, chunks: list[dict[str, any]]
     ) -> ExtendedOCRResponse:
         """
         Extend the response with chunk metadata.

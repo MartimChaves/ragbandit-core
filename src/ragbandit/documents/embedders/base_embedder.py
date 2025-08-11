@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from document_data_models import ExtendedOCRResponse
+from ragbandit.schema import ExtendedOCRResponse
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
