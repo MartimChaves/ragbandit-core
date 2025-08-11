@@ -2,8 +2,6 @@ from ragbandit.documents.ocr.base_ocr import BaseOCR
 
 import logging
 import os
-from pathlib import Path
-from io import BytesIO, BufferedReader
 from mistralai import Mistral, OCRResponse
 from document_utils.file_encryption import SecureFileHandler
 
@@ -32,18 +30,7 @@ class MistralOCRDocument(BaseOCR):
         Returns:
             OCRResponse: The OCR response from Mistral
         """
-        file_name = os.path.basename(pdf_filepath)
-        pdf_file_exists = os.path.isfile(pdf_filepath)
-
-        if not pdf_file_exists:
-            self.logger.error(f"PDF file {pdf_filepath} not found")
-            raise ValueError(f"PDF file {pdf_filepath} not found")
-
-        self.logger.info("Decrypting for OCR...")
-        decrypted = self.secure_handler.read_encrypted_file(Path(pdf_filepath))
-        raw = BytesIO(decrypted)
-        raw.seek(0)
-        reader = BufferedReader(raw)
+        file_name, reader = self.validate_and_prepare_file(pdf_filepath)
 
         self.logger.info("Creating OCR...")
         uploaded_pdf = self.client.files.upload(
@@ -54,7 +41,7 @@ class MistralOCRDocument(BaseOCR):
             purpose="ocr",
         )
 
-        del raw, reader
+        del reader
 
         signed_url = self.client.files.get_signed_url(file_id=uploaded_pdf.id)
         self.logger.info(
