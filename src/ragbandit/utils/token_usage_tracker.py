@@ -8,31 +8,14 @@ for different LLM models.
 import logging
 import tiktoken
 from typing import Dict, Tuple
+from ragbandit.config.pricing import (
+    MODEL_COSTS,
+    EMBEDDING_COSTS,
+    DEFAULT_MODEL
+)
 
 # Configure logger
 logger = logging.getLogger(__name__)
-
-# Token cost rates per 1M tokens (in USD)
-# Based on Mistral AI pricing as of July 2025
-MODEL_COSTS = {
-    # Format: "model_name": (input_cost_per_1M, output_cost_per_1M)
-    "mistral-small-latest": (2.00, 6.00),
-    "mistral-medium-latest": (6.00, 18.00),
-    "mistral-large-latest": (12.00, 36.00),
-    # Add other models as needed
-}
-
-# Embedding model costs per 1M tokens
-EMBEDDING_COSTS = {
-    # Format: "model_name": cost_per_1M_tokens
-    "mistral-embed": 0.10,
-    "text-embedding-3-small": 0.02,
-    "text-embedding-3-large": 0.13,
-    # Add other embedding models as needed
-}
-
-# Default model to use if the specified model is not in MODEL_COSTS
-DEFAULT_MODEL = "mistral-small-latest"
 
 
 def count_tokens(text: str, model: str = DEFAULT_MODEL) -> int:
