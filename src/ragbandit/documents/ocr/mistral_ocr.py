@@ -3,7 +3,7 @@ from ragbandit.documents.ocr.base_ocr import BaseOCR
 import logging
 import os
 from mistralai import Mistral, OCRResponse
-from document_utils.file_encryption import SecureFileHandler
+from ragbandit.documents.utils.secure_file_handler import SecureFileHandler
 
 
 class MistralOCRDocument(BaseOCR):

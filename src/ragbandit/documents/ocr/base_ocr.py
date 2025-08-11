@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from io import BytesIO, BufferedReader
 from mistralai import OCRResponse
-from document_utils.file_encryption import SecureFileHandler
+from ragbandit.documents.utils.secure_file_handler import SecureFileHandler
 
 
 class BaseOCR(ABC):
