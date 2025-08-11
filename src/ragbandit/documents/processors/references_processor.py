@@ -11,7 +11,7 @@ from difflib import SequenceMatcher
 
 from ragbandit.documents.processors.base_processor import BaseProcessor
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
-from ragbandit.prompt_tools.detect_references_header_tool import (
+from ragbandit.prompt_tools.references_processor_tools import (
     detect_references_header_tool,
 )
 from ragbandit.schema import ExtendedOCRResponse
