@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from document_data_models import ExtendedOCRResponse
+from ragbandit.schema import ExtendedOCRResponse
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
