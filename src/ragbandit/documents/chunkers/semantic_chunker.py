@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from ragbandit.schema import ExtendedOCRResponse
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
-from prompt_template_tools.find_semantic_break_tool import (
+from ragbandit.prompt_tools.semantic_chunker_tools import (
     find_semantic_break_tool,
 )
 
