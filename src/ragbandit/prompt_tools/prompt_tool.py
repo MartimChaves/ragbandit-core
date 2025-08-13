@@ -2,7 +2,7 @@
 Utilities for creating LLM-powered tools based on prompt templates.
 """
 
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Callable
 
 from pydantic import BaseModel
 from ragbandit.utils.llm_utils import query_llm
@@ -21,8 +21,8 @@ class PromptTool(Generic[T]):
         output_schema: type[T],
         model: str = "mistral-small-latest",
         temperature: float = 0,
-        preprocess_fn: callable[[dict[str, any]], dict[str, any]] = None,
-        postprocess_fn: callable[[T], any] = None,
+        preprocess_fn: Callable[[dict[str, any]], dict[str, any]] = None,
+        postprocess_fn: Callable[[T], any] = None,
     ):
         """Initialize a new prompt-based tool.
 
@@ -88,8 +88,8 @@ def create_prompt_tool(
     output_schema: type[T],
     model: str = "mistral-small-latest",
     temperature: float = 0,
-    preprocess_fn: callable[[dict[str, any]], dict[str, any]] = None,
-    postprocess_fn: callable[[T], any] = None,
+    preprocess_fn: Callable[[dict[str, any]], dict[str, any]] = None,
+    postprocess_fn: Callable[[T], any] = None,
 ) -> PromptTool[T]:
     """Create a new prompt-based tool with the given template and schema."""
     return PromptTool(
