@@ -11,7 +11,7 @@ references or explanations, and processes them accordingly:
 from difflib import SequenceMatcher
 
 from ragbandit.documents.processors.base_processor import BaseProcessor
-from document_utils.cost_tracking import TokenUsageTracker
+from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 from ragbandit.prompt_tools.footnotes_processor_tools import (
     detect_footnote_section_tool,
