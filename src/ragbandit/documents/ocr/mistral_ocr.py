@@ -22,7 +22,7 @@ class MistralOCRDocument(BaseOCR):
         self.secure_handler = SecureFileHandler()
 
     def process(
-        self, pdf_filepath: str, encrypted: bool = True
+        self, pdf_filepath: str, encrypted: bool = False
     ) -> OCRResponse:
         """Process a PDF file through Mistral's OCR API.
 
