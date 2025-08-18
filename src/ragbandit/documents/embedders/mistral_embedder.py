@@ -1,6 +1,5 @@
 import numpy as np
-from mistralai import Mistral
-
+from ragbandit.utils import mistral_client_manager
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 from ragbandit.documents.embedders.base_embedder import BaseEmbedder
 
@@ -10,7 +9,7 @@ class MistralEmbedder(BaseEmbedder):
 
     def __init__(
         self,
-        api_key: str = None,
+        api_key: str,
         model: str = "mistral-embed",
         name: str = None,
     ):
@@ -18,8 +17,7 @@ class MistralEmbedder(BaseEmbedder):
         Initialize the Mistral embedder.
 
         Args:
-            api_key: Mistral API key (if None, will try to use environment
-                     variable)
+            api_key: Mistral API key
             model: Embedding model to use
             name: Optional name for the embedder
         """
@@ -27,7 +25,7 @@ class MistralEmbedder(BaseEmbedder):
         self.model = model
 
         # Initialize the Mistral client
-        self.client = Mistral(api_key=api_key)
+        self.client = mistral_client_manager.get_client(api_key)
 
         self.logger.info(
             f"Initialized MistralEmbedder with model {self.model}"

@@ -146,6 +146,7 @@ footnote_insertion_instruction_tool = create_prompt_tool(
 
 
 def replace_footnote_inline_operation(
+    api_key: str,
     footnote: dict,
     markdown: str,
     usage_tracker: TokenUsageTracker | None = None
@@ -161,6 +162,7 @@ def replace_footnote_inline_operation(
       2) Apply those instructions to the original text.
 
     Args:
+        api_key: Mistral API Key
         footnote (dict): {
             'footnote_symbol': '*',
             'footnote_text': 'Corresponding author',
@@ -180,6 +182,7 @@ def replace_footnote_inline_operation(
     footnote_text = f"{footnote_symbol}{footnote.get('footnote_text', '')}"
 
     replace_instruction = footnote_insertion_instruction_tool(
+        api_key=api_key,
         footnote_text=footnote_text,
         markdown=markdown,
         usage_tracker=usage_tracker

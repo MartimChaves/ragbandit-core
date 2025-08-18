@@ -12,13 +12,21 @@ class BaseChunker(ABC):
     provide specific chunking logic.
     """
 
-    def __init__(self, name: str | None = None):
+    def __init__(self, name: str | None = None, api_key: str | None = None):
+        """
+        Initialize the chunker.
+
+        Args:
+            name: Optional name for the chunker
+            api_key: API key for LLM services
+        """
         # Hierarchical names make it easy to filter later:
         #   chunker.semantic, chunker.fixed_size, etc.
         base = "chunker"
         self.logger = logging.getLogger(
             f"{base}.{name or self.__class__.__name__}"
         )
+        self.api_key = api_key
 
     @abstractmethod
     def chunk(

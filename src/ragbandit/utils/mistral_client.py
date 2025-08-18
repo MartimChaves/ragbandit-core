@@ -1,37 +1,76 @@
 """
-Centralized Mistral API client module.
+Utility functions for working with the Mistral API.
 
-This module provides a singleton Mistral client instance
-to be used across the application,
-ensuring consistent configuration and
-preventing duplicate initializations.
+This module provides helper functions for creating and managing
+Mistral API client instances.
+
+The module exports a singleton instance of MistralClientManager as
+'mistral_client_manager' that should be used throughout the application
+to ensure consistent client caching and management.
 """
 
 from mistralai import Mistral
-import os
 import logging
 
 # Configure logger
 logger = logging.getLogger(__name__)
 
 
-def get_mistral_client():
+class MistralClientManager:
     """
-    Get a configured Mistral client instance.
+    Manager class for Mistral API clients.
 
-    Returns:
-        Mistral: Configured client instance
-
-    Raises:
-        EnvironmentError: If MISTRAL_API_KEY is not set
+    This class provides a way to cache and
+    reuse Mistral client instances
+    based on API keys, avoiding the need to
+    create a new client for each request.
     """
-    api_key = os.getenv("MISTRAL_API_KEY")
-    if not api_key:
-        logger.error("MISTRAL_API_KEY environment variable not set")
-        raise EnvironmentError("MISTRAL_API_KEY environment variable not set")
 
-    return Mistral(api_key=api_key)
+    def __init__(self):
+        """Initialize an empty client cache."""
+        self._clients: dict[str, Mistral] = {}
+
+    def get_mistral_client(self, api_key: str):
+        """
+        Get a configured Mistral client instance.
+
+        Returns:
+            Mistral: Configured client instance
+
+        Raises:
+            ValueError: If api_key is None
+        """
+        if not api_key or not api_key.strip():
+            raise ValueError("Mistral API key cannot be empty or None")
+        return Mistral(api_key=api_key)
+
+    def get_client(self, api_key: str) -> Mistral:
+        """
+        Get a Mistral client for the given API key.
+
+        If a client with this API key already exists in the cache,
+        it will be reused.
+        Otherwise, a new client will be created and cached.
+
+        Args:
+            api_key: Mistral API key to use for authentication
+
+        Returns:
+            Mistral: A configured Mistral client instance
+
+        Raises:
+            ValueError: If api_key is empty or None
+        """
+        # Hash the API key to use as a dictionary key
+        # This avoids storing the actual API key in memory as a dictionary key
+        key_hash = hash(api_key)
+
+        if key_hash not in self._clients:
+            # Create a new client and cache it
+            self._clients[key_hash] = self.get_mistral_client(api_key)
+
+        return self._clients[key_hash]
 
 
-# Singleton instance to be imported by other modules
-mistral_client = get_mistral_client()
+# Global instance of the client manager
+mistral_client_manager = MistralClientManager()

@@ -21,7 +21,12 @@ class SemanticChunker(BaseChunker):
     into coherent chunks based on content.
     """
 
-    def __init__(self, min_chunk_size: int = 500, name: str | None = None):
+    def __init__(
+        self,
+        min_chunk_size: int = 500,
+        name: str | None = None,
+        api_key: str | None = None
+    ):
         """
         Initialize the semantic chunker.
 
@@ -29,8 +34,9 @@ class SemanticChunker(BaseChunker):
             min_chunk_size: Minimum size for chunks
                             (smaller chunks will be merged)
             name: Optional name for the chunker
+            api_key: Mistral API Key
         """
-        super().__init__(name)
+        super().__init__(name, api_key)
         self.min_chunk_size = min_chunk_size
 
     def semantic_chunk_pages(
@@ -54,7 +60,9 @@ class SemanticChunker(BaseChunker):
             # If we have "remainder" from the last iteration,
             # it might be appended here
             break_lead = find_semantic_break_tool(
-                text=full_text, usage_tracker=usage_tracker
+                api_key=self.api_key,
+                text=full_text,
+                usage_tracker=usage_tracker
             )
 
             if break_lead == "NO_BREAK":

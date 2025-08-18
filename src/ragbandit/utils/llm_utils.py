@@ -11,7 +11,7 @@ import logging
 import requests
 from typing import Type, TypeVar
 from pydantic import BaseModel
-from ragbandit.utils.mistral_client import mistral_client
+from ragbandit.utils.mistral_client import mistral_client_manager
 from ragbandit.config.llms import (
     DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
@@ -31,6 +31,7 @@ T = TypeVar("T", bound=BaseModel)
 def query_llm(
     prompt: str,
     output_schema: Type[T],
+    api_key: str,
     usage_tracker: TokenUsageTracker | None = None,
     model: str = DEFAULT_MODEL,
     temperature: float = DEFAULT_TEMPERATURE,
@@ -45,6 +46,7 @@ def query_llm(
     Args:
         prompt: The prompt to send to the LLM
         output_schema: Pydantic model class for response validation and parsing
+        api_key: API key to use for the request
         usage_tracker: Optional custom token usage tracker for
                        document-specific tracking.
                        If None, no tracking will be performed even
@@ -81,7 +83,8 @@ def query_llm(
     while retry_count <= max_retries:
         try:
             # Make the API request
-            chat_response = mistral_client.chat.complete(
+            client = mistral_client_manager.get_client(api_key)
+            chat_response = client.chat.complete(
                 model=model,
                 messages=[
                     {

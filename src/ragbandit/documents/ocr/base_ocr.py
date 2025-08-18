@@ -14,14 +14,15 @@ class BaseOCR(ABC):
     implementation using Mistral's OCR API.
     """
 
-    def __init__(self, logger: logging.Logger = None):
+    def __init__(self, logger: logging.Logger = None, **kwargs):
         """Initialize the OCR processor.
 
         Args:
             logger: Optional logger for OCR events
+            **kwargs: Additional keyword arguments (e.g., encryption_key)
         """
         self.logger = logger or logging.getLogger(__name__)
-        self.secure_handler = SecureFileHandler()
+        self.kwargs = kwargs
 
     def validate_pdf(self, pdf_filepath: str) -> str:
         """Validate that a PDF file exists.
@@ -52,9 +53,22 @@ class BaseOCR(ABC):
 
         Returns:
             BufferedReader: A buffered reader for the decrypted file content
+
+        Raises:
+            ValueError: If encryption_key is not provided in kwargs
         """
         self.logger.info("Decrypting for OCR...")
-        decrypted = self.secure_handler.read_encrypted_file(Path(pdf_filepath))
+
+        encryption_key = self.kwargs.get("encryption_key")
+        if not encryption_key:
+            raise ValueError(
+                "encryption_key must be provided in kwargs "
+                "for encrypted file operations. "
+                "Pass encryption_key when initializing the OCR processor."
+            )
+
+        secure_handler = SecureFileHandler(encryption_key=encryption_key)
+        decrypted = secure_handler.read_encrypted_file(Path(pdf_filepath))
         raw = BytesIO(decrypted)
         raw.seek(0)
         return BufferedReader(raw)

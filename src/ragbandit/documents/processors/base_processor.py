@@ -10,24 +10,36 @@ class BaseProcessor(ABC):
     Subclasses override `process()` and, optionally, `extend_response()`.
     """
 
-    def __init__(self, name: str | None = None):
+    def __init__(self, name: str | None = None, api_key: str | None = None):
+        """
+        Initialize the processor.
+
+        Args:
+            name: Optional name for the processor
+            api_key: API key for LLM services
+        """
         # Hierarchical names make it easy to filter later:
         #   pipeline.text_cleaner, pipeline.language_model, …
         base = "pipeline"
         self.logger = logging.getLogger(
             f"{base}.{name or self.__class__.__name__}"
         )
+        self.api_key = api_key
 
     @abstractmethod
     def process(
         self,
         response: ExtendedOCRResponse,
-        usage_tracker: TokenUsageTracker,
+        usage_tracker: TokenUsageTracker | None = None,
     ) -> tuple[ExtendedOCRResponse, dict[str, any]]:
         """
         Do one step of work and return:
           * a (possibly modified) ExtendedOCRResponse
           * a dict of metadata specific to this processor
+
+        Args:
+            response: The OCR response to process
+            usage_tracker: Optional token usage tracker
         """
         raise NotImplementedError
     # ----------------------------------------------------------------------

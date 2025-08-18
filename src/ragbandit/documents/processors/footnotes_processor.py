@@ -33,6 +33,14 @@ class FootnoteProcessor(BaseProcessor):
     4. Collects citation footnotes for inclusion in references
     5. Returns the modified document and the extracted footnote references
     """
+    def __init__(self, name: str | None = None, api_key: str | None = None):
+        """Initialize the references processor.
+
+        Args:
+            name: Optional name for the processor
+            api_key: API key for LLM services
+        """
+        super().__init__(name, api_key)
 
     def process(
         self,
@@ -79,6 +87,7 @@ class FootnoteProcessor(BaseProcessor):
         footnote_sections = {}
         for page in ocr_pages.pages:
             page_footnote_section = detect_footnote_section_tool(
+                api_key=self.api_key,
                 ocr_response_page=page.markdown,
                 usage_tracker=usage_tracker
             )
@@ -210,6 +219,7 @@ class FootnoteProcessor(BaseProcessor):
             for footnote in footnotes_listed[page_index]:
                 # Get footnote symbol and text
                 footnote_start = detect_footnote_start_tool(
+                    api_key=self.api_key,
                     footnote=footnote,
                     usage_tracker=usage_tracker
                 )
@@ -223,6 +233,7 @@ class FootnoteProcessor(BaseProcessor):
                 # We assume that explanations are to be inlined,
                 # and references added to the references
                 footnote_classification = classify_footnote_tool(
+                    api_key=self.api_key,
                     footnote_text=footnote_text,
                     usage_tracker=usage_tracker
                 )
@@ -276,7 +287,10 @@ class FootnoteProcessor(BaseProcessor):
                     # If footnote is an explanation,
                     # inline it where the footnote is called
                     page_markdown = replace_footnote_inline_operation(
-                        footnote, page_markdown, usage_tracker
+                        self.api_key,
+                        footnote,
+                        page_markdown,
+                        usage_tracker
                     )
 
             # Delete footnote sections

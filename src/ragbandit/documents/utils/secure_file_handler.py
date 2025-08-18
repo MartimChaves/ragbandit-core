@@ -10,15 +10,22 @@ import shutil
 class SecureFileHandler:
     """Handles secure file operations with encryption at rest."""
 
-    def __init__(self):
-        key = os.getenv("FILE_ENCRYPTION_KEY")
-        if not key:
-            raise ValueError("FILE_ENCRYPTION_KEY not set in environment")
+    def __init__(self, encryption_key: str):
+        """Initialize the secure file handler with an encryption key.
+
+        Args:
+            encryption_key: The encryption key to use for file operations
+
+        Raises:
+            ValueError: If encryption_key is empty or invalid format
+        """
+        if not encryption_key:
+            raise ValueError("Encryption key cannot be empty")
         try:
             # Validate the key by creating a cipher
-            self._cipher = Fernet(key.encode())
+            self._cipher = Fernet(encryption_key.encode())
         except InvalidToken:
-            raise ValueError("Invalid FILE_ENCRYPTION_KEY format")
+            raise ValueError("Invalid encryption key format")
 
     def save_encrypted_file(
         self, content: bytes, prefix: str = "doc", original_file_name=""

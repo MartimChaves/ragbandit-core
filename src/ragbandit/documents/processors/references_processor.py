@@ -27,6 +27,15 @@ class ReferencesProcessor(BaseProcessor):
     4. Returns the modified document and the extracted references as markdown
     """
 
+    def __init__(self, name: str | None = None, api_key: str | None = None):
+        """Initialize the references processor.
+
+        Args:
+            name: Optional name for the processor
+            api_key: API key for LLM services
+        """
+        super().__init__(name, api_key)
+
     def process(
         self,
         ocr_pages: ExtendedOCRResponse,
@@ -161,7 +170,9 @@ class ReferencesProcessor(BaseProcessor):
 
         # Use LLM to identify the most likely references header
         refs = detect_references_header_tool(
-            headers_list=headers, usage_tracker=usage_tracker
+            api_key=self.api_key,
+            usage_tracker=usage_tracker,
+            headers_list=headers
         )
 
         # Find the best match for the identified header

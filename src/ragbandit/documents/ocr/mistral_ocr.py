@@ -1,25 +1,31 @@
 from ragbandit.documents.ocr.base_ocr import BaseOCR
 
 import logging
-import os
-from mistralai import Mistral, OCRResponse
-from ragbandit.documents.utils.secure_file_handler import SecureFileHandler
+from mistralai import OCRResponse
+from ragbandit.utils import mistral_client_manager
 
 
 class MistralOCRDocument(BaseOCR):
     """OCR document processor using Mistral's API."""
 
-    def __init__(self, api_key: str = None, logger: logging.Logger = None):
-        """Initialize the Mistral OCR processor.
+    def __init__(
+        self,
+        api_key: str,
+        logger: logging.Logger = None,
+        **kwargs
+    ):
+        """
+        Initialize the Mistral OCR processor.
 
         Args:
-            api_key: Mistral API key (defaults to MISTRAL_API_KEY env variable)
+            api_key: Mistral API key
             logger: Optional logger for OCR events
+            **kwargs: Additional keyword arguments
+                - encryption_key: Optional key for encrypted file operations
         """
-        super().__init__(logger)
-        api_key = api_key or os.getenv("MISTRAL_API_KEY")
-        self.client = Mistral(api_key=api_key)
-        self.secure_handler = SecureFileHandler()
+        # Pass all kwargs to the base class
+        super().__init__(logger=logger, **kwargs)
+        self.client = mistral_client_manager.get_client(api_key)
 
     def process(
         self, pdf_filepath: str, encrypted: bool = False

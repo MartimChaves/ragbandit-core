@@ -59,12 +59,23 @@ class PromptTool(Generic[T]):
         return result
 
     def __call__(
-        self, usage_tracker: TokenUsageTracker | None = None, **kwargs
+        self,
+        api_key: str,
+        usage_tracker: TokenUsageTracker | None = None,
+        **kwargs
     ) -> any:
         """Execute the tool with the given variables.
 
+        Args:
+            api_key: Mistral API key for authentication
+            usage_tracker: Optional token usage tracker
+            **kwargs: Variables to substitute in the prompt template
+
+        Returns:
+            Processed result from the LLM
+
         This makes the tool callable like a function, e.g.:
-        result = my_tool(var1="value", var2="value2")
+        result = my_tool(api_key="your_api_key", var1="value", var2="value2")
         """
         # Format the prompt with variables
         prompt = self.format_prompt(**kwargs)
@@ -73,6 +84,7 @@ class PromptTool(Generic[T]):
         result = query_llm(
             prompt=prompt,
             output_schema=self.output_schema,
+            api_key=api_key,
             usage_tracker=usage_tracker,
             model=self.model,
             temperature=self.temperature,
@@ -91,7 +103,11 @@ def create_prompt_tool(
     preprocess_fn: Callable[[dict[str, any]], dict[str, any]] = None,
     postprocess_fn: Callable[[T], any] = None,
 ) -> PromptTool[T]:
-    """Create a new prompt-based tool with the given template and schema."""
+    """Create a new prompt-based tool with the given template and schema.
+
+    Note: When calling the returned tool,
+    you must provide an api_key parameter.
+    """
     return PromptTool(
         template=template,
         output_schema=output_schema,
