@@ -7,7 +7,6 @@ for different LLM models.
 
 import logging
 import tiktoken
-from typing import Dict, Tuple
 from ragbandit.config.pricing import (
     MODEL_COSTS,
     EMBEDDING_COSTS,
@@ -43,7 +42,7 @@ def count_tokens(text: str, model: str = DEFAULT_MODEL) -> int:
 
 def calculate_cost(
     input_tokens: int, output_tokens: int, model: str = DEFAULT_MODEL
-) -> Tuple[float, Dict[str, float]]:
+) -> tuple[float, dict[str, float]]:
     """
     Calculate the cost of an API call based on token usage.
 
@@ -157,7 +156,7 @@ class TokenUsageTracker:
         )
         self.calls_by_model[model]["cost"] += cost
 
-    def get_summary(self) -> Dict:
+    def get_summary(self) -> dict:
         """
         Get a summary of token usage and costs.
 
