@@ -170,7 +170,7 @@ class DocumentPipeline:
             )
             logging.getLogger().removeHandler(self._transcript)
 
-    def perform_ocr(self, pdf_filepath: str) -> OCRResponse:
+    def run_ocr(self, pdf_filepath: str) -> OCRResponse:
         """Perform OCR on a PDF file using the configured OCR processor.
 
         Args:
