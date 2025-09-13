@@ -45,10 +45,10 @@ class PageDimensions(BaseModel):
 class Image(BaseModel):
     """Represents an image extracted from a page."""
     id: str  # e.g., 'img-01.jpg'
-    top_left_x: int
-    top_left_y: int
-    bottom_right_x: int
-    bottom_right_y: int
+    top_left_x: int | None = None
+    top_left_y: int | None = None
+    bottom_right_x: int | None = None
+    bottom_right_y: int | None = None
     image_base64: str
     image_annotation: str | None = None # JSON string
 
