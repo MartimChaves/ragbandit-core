@@ -1,6 +1,7 @@
 """Base schema for data structures."""
 from mistralai import OCRResponse
 from pydantic import BaseModel, RootModel
+from datetime import datetime
 
 
 class ProcessorConfig(BaseModel):
@@ -66,3 +67,81 @@ class ChunkModel(BaseModel):
 
 class ChunksModel(BaseModel):
     chunks: list[ChunkModel]
+
+##########################################
+# ************* V2 Schema ************** #
+##########################################
+
+##########################################
+#                Metrics                 #
+##########################################
+
+
+class TokenUsageMetrics(BaseModel):
+    """Metrics for token usage and cost."""
+    model: str
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_cost: float | None = None
+    prompt_cost: float | None = None
+    completion_cost: float | None = None
+
+
+class TimingMetrics(BaseModel):
+    """Metrics for pipeline step durations in seconds."""
+    total_duration: float
+    ocr: float | None = None
+    processing_steps: list[dict[str, float]] | None = None
+    chunking: float | None = None
+    embedding: float | None = None
+
+##########################################
+#                  OCR                   #
+##########################################
+
+
+class PageDimensions(BaseModel):
+    dpi: int
+    height: int
+    width: int
+
+
+class Image(BaseModel):
+    """Represents an image extracted from a page."""
+    id: str  # e.g., 'img-01.jpg'
+    top_left_x: int | None = None
+    top_left_y: int | None = None
+    bottom_right_x: int | None = None
+    bottom_right_y: int | None = None
+    image_base64: str
+    image_annotation: str | None = None  # JSON string
+
+
+class BasePage(BaseModel):
+    """Base schema for a single page of a document."""
+    index: int  # Page number
+    markdown: str
+    images: list[Image] | None = None
+    dimensions: PageDimensions
+
+
+class OCRPage(BasePage):
+    """Represents a single page from an OCR result."""
+    pass
+
+
+class OCRUsageInfo(BaseModel):
+    pages_processed: int
+    doc_size_bytes: int
+
+
+class OCRResult(BaseModel):
+    """Represents the output of the OCR process."""
+    source_file_path: str
+    processed_at: datetime
+    model: str
+    document_annotation: str | None = None
+    pages: list[OCRPage]
+    usage_info: OCRUsageInfo
+    metrics: TokenUsageMetrics | None = None  # If OCR uses an LLM
