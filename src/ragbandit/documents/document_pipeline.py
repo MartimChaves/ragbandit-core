@@ -9,7 +9,7 @@ import logging
 import traceback
 from datetime import datetime, timezone
 
-from mistralai import OCRResponse
+from ragbandit.schema import OCRResult, ExtendedOCRResponse
 
 from ragbandit.documents.ocr import BaseOCR
 from ragbandit.documents.processors.base_processor import BaseProcessor
@@ -17,7 +17,6 @@ from ragbandit.documents.chunkers.base_chunker import BaseChunker
 from ragbandit.documents.embedders.base_embedder import BaseEmbedder
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
-from ragbandit.schema import ExtendedOCRResponse
 from ragbandit.utils.in_memory_log_handler import InMemoryLogHandler
 
 
@@ -80,7 +79,7 @@ class DocumentPipeline:
 
     def run_processors(
         self,
-        ocr_response: OCRResponse,
+        ocr_result: OCRResult,
         document_id: str,
         metadata: dict[str, any] | None = None,
         usage_tracker: TokenUsageTracker | None = None,
@@ -88,7 +87,7 @@ class DocumentPipeline:
         """Process a document through the processors pipeline.
 
         Args:
-            ocr_response: The initial OCR response to process
+            ocr_result: The initial OCR result to process
             document_id: Unique identifier for the document
             metadata: Optional metadata to include in the extended response
             usage_tracker: Optional token usage tracker
@@ -105,7 +104,7 @@ class DocumentPipeline:
 
             # Initialize the extended response with the OCR response
             extended_response = ExtendedOCRResponse(
-                                    **ocr_response.model_dump()
+                                    **ocr_result.model_dump()
                                 )
 
             # Add processing metadata
@@ -162,7 +161,7 @@ class DocumentPipeline:
             # that's handled by the process method
             if extended_response is None:
                 extended_response = ExtendedOCRResponse(
-                                        **ocr_response.model_dump()
+                                        **ocr_result.model_dump()
                                     )
 
     def run_chunker(
@@ -246,14 +245,14 @@ class DocumentPipeline:
             )
             raise
 
-    def perform_ocr(self, pdf_filepath: str) -> OCRResponse:
+    def perform_ocr(self, pdf_filepath: str) -> OCRResult:
         """Perform OCR on a PDF file using the configured OCR processor.
 
         Args:
             pdf_filepath: Path to the PDF file to process
 
         Returns:
-            OCRResponse: The OCR response from the processor
+            OCRResult: The OCR result from the processor
         """
         return self.ocr_processor.process(pdf_filepath)
 
@@ -296,7 +295,7 @@ class DocumentPipeline:
                 f"Starting OCR processing for document: {document_id}"
             )
             try:
-                ocr_response = self.perform_ocr(pdf_filepath)
+                ocr_result = self.perform_ocr(pdf_filepath)
                 self.logger.info("OCR processing completed")
             except Exception as e:
                 self.logger.error(f"OCR processing failed: {e}")
@@ -307,14 +306,14 @@ class DocumentPipeline:
             self.logger.info("Starting document processors")
             try:
                 extended_response = self.run_processors(
-                    ocr_response, document_id, metadata, usage_tracker
+                    ocr_result, document_id, metadata, usage_tracker
                 )
                 self.logger.info("Document processors completed")
             except Exception as e:
                 self.logger.error(f"Document processors failed: {e}")
                 # If processors fail, we still have the OCR response to return
                 extended_response = ExtendedOCRResponse(
-                                        **ocr_response.model_dump()
+                                        **ocr_result.model_dump()
                                     )
                 if metadata:
                     extended_response.processing_metadata = metadata
