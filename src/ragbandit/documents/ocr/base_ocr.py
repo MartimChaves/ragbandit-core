@@ -3,8 +3,8 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from io import BytesIO, BufferedReader
-from mistralai import OCRResponse
 from ragbandit.documents.utils.secure_file_handler import SecureFileHandler
+from ragbandit.schema import OCRResult
 
 
 class BaseOCR(ABC):
@@ -115,13 +115,13 @@ class BaseOCR(ABC):
         return file_name, reader
 
     @abstractmethod
-    def process(self, pdf_filepath: str) -> OCRResponse:
+    def process(self, pdf_filepath: str) -> OCRResult:
         """Process a PDF file through OCR.
 
         Args:
             pdf_filepath: Path to the PDF file to process
 
         Returns:
-            OCRResponse: The OCR response from the processor
+            OCRResult: The OCR result from the processor
         """
         raise NotImplementedError("Subclasses must implement process method")
