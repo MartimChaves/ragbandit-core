@@ -145,3 +145,29 @@ class OCRResult(BaseModel):
     pages: list[OCRPage]
     usage_info: OCRUsageInfo
     metrics: TokenUsageMetrics | None = None  # If OCR uses an LLM
+
+##########################################
+#               Processing               #
+##########################################
+
+
+class ProcessedPage(BasePage):
+    """Represents a single page after text processors have been applied."""
+    pass
+
+
+class ProcessingTraceItem(BaseModel):
+    """Trace of a single processor's execution."""
+    step_name: str  # Name of the step in the processing
+    summary: str
+    duration: float  # Duration in seconds
+
+
+class ProcessingResult(BaseModel):
+    """Represents the output of the text processors."""
+    processor_name: str
+    processed_at: datetime
+    pages: list[ProcessedPage]  # The text content, now structured per page
+    processing_trace: list[ProcessingTraceItem]
+    extracted_data: dict[str, any]  # For footnotes, references, etc.
+    metrics: list[TokenUsageMetrics] | None = None
