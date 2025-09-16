@@ -9,7 +9,7 @@ import logging
 import traceback
 from datetime import datetime, timezone
 
-from ragbandit.schema import OCRResult, ExtendedOCRResponse
+from ragbandit.schema import OCRResult, ProcessingResult, ProcessedPage
 
 from ragbandit.documents.ocr import BaseOCR
 from ragbandit.documents.processors.base_processor import BaseProcessor
@@ -80,58 +80,64 @@ class DocumentPipeline:
     def run_processors(
         self,
         ocr_result: OCRResult,
-        document_id: str,
         metadata: dict[str, any] | None = None,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> ExtendedOCRResponse:
+    ) -> ProcessingResult:
         """Process a document through the processors pipeline.
 
         Args:
             ocr_result: The initial OCR result to process
-            document_id: Unique identifier for the document
             metadata: Optional metadata to include in the extended response
             usage_tracker: Optional token usage tracker
 
         Returns:
-            An extended OCR response with additional metadata
+            A ProcessingResult with additional metadata
             from all processors
         """
-        extended_response = None
+        proc_result: ProcessingResult | None = None
 
         try:
             # Use provided usage tracker or create a new one
             usage_tracker = usage_tracker or TokenUsageTracker()
 
-            # Initialize the extended response with the OCR response
-            extended_response = ExtendedOCRResponse(
-                                    **ocr_result.model_dump()
-                                )
+            # Convert OCRResult → ProcessingResult (shallow conversion)
+            processed_pages = [
+                ProcessedPage(**page.model_dump())
+                for page in ocr_result.pages
+            ]
+
+            proc_result = ProcessingResult(
+                processor_name="pipeline_start",
+                processed_at=datetime.now(timezone.utc),
+                pages=processed_pages,
+                processing_trace=[],
+                extracted_data={},
+                metrics=[],
+            )
 
             # Add processing metadata
             processing_metadata = metadata or {}
             processing_metadata.update(
                 {
-                    "document_id": document_id,
                     "processing_started": datetime.now(timezone.utc),
                     "processors": [str(p) for p in self.processors],
                 }
             )
 
-            # Add metadata to the extended response
-            extended_response.processing_metadata = processing_metadata
+            # Store pipeline metadata
+            proc_result.extracted_data["pipeline"] = processing_metadata
 
             # Process the document through each processor in sequence
             for processor in self.processors:
                 self.logger.info(f"Running processor: {processor}")
                 try:
                     # Process the document
-                    extended_response, processor_metadata = processor.process(
-                        extended_response, usage_tracker
+                    proc_result, processor_metadata = processor.process(
+                        proc_result, usage_tracker
                     )
 
-                    # Extend the response with processor-specific metadata
-                    extended_response = processor.extend_response(
-                        extended_response, processor_metadata
+                    proc_result = processor.extend_response(
+                        proc_result, processor_metadata
                     )
 
                     self.logger.info(
@@ -146,27 +152,37 @@ class DocumentPipeline:
                     # Continue with the next processor
                     continue
 
-            # Add token usage information to the extended response
             usage_summary = usage_tracker.get_summary()
-            extended_response.processing_metadata["token_usage"] = \
-                usage_summary
+            proc_result.extracted_data.setdefault("pipeline", {})[
+                "token_usage"
+            ] = usage_summary
 
-            # Update processing metadata
+            # Stamp completion time
             now = datetime.now(timezone.utc)
-            extended_response.processing_metadata["processing_completed"] = now
+            pipeline_meta = proc_result.extracted_data["pipeline"]
+            pipeline_meta["processing_completed"] = now
 
-            return extended_response
+            return proc_result
         finally:
             # We don't save logs or remove handlers here since
             # that's handled by the process method
-            if extended_response is None:
-                extended_response = ExtendedOCRResponse(
-                                        **ocr_result.model_dump()
-                                    )
+            if proc_result is None:
+                processed_pages = [
+                    ProcessedPage(**page.model_dump())
+                    for page in ocr_result.pages
+                ]
+                proc_result = ProcessingResult(
+                    processor_name="pipeline_start",
+                    processed_at=datetime.now(timezone.utc),
+                    pages=processed_pages,
+                    processing_trace=[],
+                    extracted_data={},
+                    metrics=[],
+                )
 
     def run_chunker(
         self,
-        extended_response: ExtendedOCRResponse,
+        extended_response: ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
     ) -> list[dict[str, any]]:
         """Chunk the document using the configured chunker.
@@ -206,9 +222,9 @@ class DocumentPipeline:
     def run_embedder(
         self,
         chunks: list[dict[str, any]],
-        extended_response: ExtendedOCRResponse,
+        extended_response: ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> ExtendedOCRResponse:
+    ) -> ProcessingResult:
         """Embed chunks using the configured embedder.
 
         Args:
@@ -259,11 +275,10 @@ class DocumentPipeline:
     def process(
         self,
         pdf_filepath: str,
-        document_id: str,
         metadata: dict[str, any] | None = None,
         run_chunking: bool = True,
         run_embedding: bool = True,
-    ) -> ExtendedOCRResponse:
+    ) -> ProcessingResult:
         """Process a document through the complete pipeline.
 
         This method orchestrates the entire document processing pipeline:
@@ -274,13 +289,12 @@ class DocumentPipeline:
 
         Args:
             pdf_filepath: Path to the PDF file to process
-            document_id: Unique identifier for the document
             metadata: Optional metadata to include in the extended response
             run_chunking: Whether to run the chunking step
             run_embedding: Whether to run the embedding step
 
         Returns:
-            An extended OCR response with all processing results
+            A ProcessingResult with all processing results
 
         Raises:
             Exception: If any critical step in the pipeline fails
@@ -291,9 +305,7 @@ class DocumentPipeline:
 
         try:
             # Step 1: OCR
-            self.logger.info(
-                f"Starting OCR processing for document: {document_id}"
-            )
+            self.logger.info("Starting OCR processing.")
             try:
                 ocr_result = self.perform_ocr(pdf_filepath)
                 self.logger.info("OCR processing completed")
@@ -306,17 +318,25 @@ class DocumentPipeline:
             self.logger.info("Starting document processors")
             try:
                 extended_response = self.run_processors(
-                    ocr_result, document_id, metadata, usage_tracker
+                    ocr_result, metadata, usage_tracker
                 )
                 self.logger.info("Document processors completed")
             except Exception as e:
                 self.logger.error(f"Document processors failed: {e}")
                 # If processors fail, we still have the OCR response to return
-                extended_response = ExtendedOCRResponse(
-                                        **ocr_result.model_dump()
-                                    )
+                extended_response = ProcessingResult(
+                    processor_name="pipeline_start",
+                    processed_at=datetime.now(timezone.utc),
+                    pages=[
+                        ProcessedPage(**page.model_dump())
+                        for page in ocr_result.pages
+                    ],
+                    processing_trace=[],
+                    extracted_data={},
+                    metrics=[],
+                )
                 if metadata:
-                    extended_response.processing_metadata = metadata
+                    extended_response.extracted_data["pipeline"] = metadata
                 return extended_response
 
             # Step 3: Chunking (if enabled)
@@ -326,9 +346,9 @@ class DocumentPipeline:
                 try:
                     chunks = self.run_chunker(extended_response, usage_tracker)
                     # Store chunks in metadata
-                    if extended_response.processing_metadata is None:
-                        extended_response.processing_metadata = {}
-                    extended_response.processing_metadata["chunks"] = {
+                    if extended_response.extracted_data is None:
+                        extended_response.extracted_data = {}
+                    extended_response.extracted_data["chunks"] = {
                         "count": len(chunks),
                         "chunker": str(self.chunker),
                     }
@@ -339,9 +359,9 @@ class DocumentPipeline:
                     self.logger.error(f"Chunking failed: {e}")
                     # If chunking fails, we can't proceed with embedding
                     # but we can return the processed document
-                    if extended_response.processing_metadata is None:
-                        extended_response.processing_metadata = {}
-                    extended_response.processing_metadata["chunking_error"] = \
+                    if extended_response.extracted_data is None:
+                        extended_response.extracted_data = {}
+                    extended_response.extracted_data["chunking_error"] = \
                         str(e)
                     run_embedding = False
 
@@ -357,32 +377,30 @@ class DocumentPipeline:
                     self.logger.error(f"Embedding failed: {e}")
                     # If embedding fails,
                     # we still have the processed document and chunks
-                    if extended_response.processing_metadata is None:
-                        extended_response.processing_metadata = {}
+                    if extended_response.extracted_data is None:
+                        extended_response.extracted_data = {}
                     extended_response\
-                        .processing_metadata["embedding_error"] = str(e)
+                        .extracted_data["embedding_error"] = str(e)
 
             # Update final token usage
-            if extended_response.processing_metadata is None:
-                extended_response.processing_metadata = {}
-            extended_response.processing_metadata["total_token_usage"] = (
+            if extended_response.extracted_data is None:
+                extended_response.extracted_data = {}
+            extended_response.extracted_data["total_token_usage"] = (
                 usage_tracker.get_summary()
             )
 
-            self.logger.info(
-                f"Document processing completed for document: {document_id}"
-            )
+            self.logger.info("Document processing completed for document.")
             return extended_response
 
         finally:
             # Ensure logs are captured even if an exception occurs
-            if extended_response and extended_response.processing_metadata:
-                extended_response.processing_metadata["logs"] = (
+            if extended_response and extended_response.extracted_data:
+                extended_response.extracted_data["logs"] = (
                     self._transcript.dump()
                 )
             elif extended_response:
-                # Create processing_metadata if it doesn't exist
-                extended_response.processing_metadata = {
+                # Create extracted_data if it doesn't exist
+                extended_response.extracted_data = {
                     "logs": self._transcript.dump()
                 }
             # Always remove the handler when done
