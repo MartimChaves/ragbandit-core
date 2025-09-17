@@ -171,3 +171,65 @@ class ProcessingResult(BaseModel):
     processing_trace: list[ProcessingTraceItem]
     extracted_data: dict[str, any]  # For footnotes, references, etc.
     metrics: list[TokenUsageMetrics] | None = None
+
+##########################################
+#                Chunking                #
+##########################################
+
+
+class ChunkMetadata(BaseModel):
+    """Metadata associated with a chunk."""
+    page_number: int
+    source_references: list[str] | None = None
+    footnotes: list[dict] | None = None
+    images: list[Image] | None = None
+    extra: dict[str, any] = {}
+
+
+class Chunk(BaseModel):
+    """Represents a chunk of text, ready for embedding."""
+    text: str
+    metadata: ChunkMetadata
+
+
+class ChunkWithEmbedding(Chunk):
+    """Represents a chunk that has been embedded."""
+    embedding: list[float]
+    embedding_model: str
+
+
+class ChunkingResult(BaseModel):
+    """Represents the output of the chunking process."""
+    processed_at: datetime
+    chunks: list[Chunk]
+    metrics: TokenUsageMetrics | None = None  # If chunker uses an LLM
+
+
+##########################################
+#                Embedding               #
+##########################################
+
+
+class EmbeddingResult(BaseModel):
+    """Represents the output of the embedding process."""
+    processed_at: datetime
+    chunks_with_embeddings: list[ChunkWithEmbedding]
+    model_name: str
+    metrics: TokenUsageMetrics
+
+##########################################
+#            Document Pipeline           #
+##########################################
+
+
+class DocumentPipelineResult(BaseModel):
+    """The composite result for an end-to-end pipeline run."""
+    source_file_path: str
+    processed_at: datetime
+    pipeline_config: dict
+    timings: TimingMetrics
+    total_metrics: list[TokenUsageMetrics]
+    ocr_result: OCRResult
+    processing_result: ProcessingResult
+    chunking_result: ChunkingResult | None = None
+    embedding_result: EmbeddingResult | None = None
