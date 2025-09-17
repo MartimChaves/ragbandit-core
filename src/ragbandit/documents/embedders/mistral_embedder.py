@@ -1,7 +1,11 @@
-import numpy as np
 from ragbandit.utils import mistral_client_manager
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 from ragbandit.documents.embedders.base_embedder import BaseEmbedder
+from ragbandit.schema import (
+    ChunkingResult,
+    EmbeddingResult,
+    ChunkWithEmbedding,
+)
 
 
 class MistralEmbedder(BaseEmbedder):
@@ -31,63 +35,94 @@ class MistralEmbedder(BaseEmbedder):
             f"Initialized MistralEmbedder with model {self.model}"
         )
 
+    # ------------------------------------------------------------------
+    # Public API
     def embed_chunks(
         self,
-        chunks: list[dict[str, any]],
-        usage_tracker: TokenUsageTracker = None
-    ) -> list[dict[str, any]]:
-        """
-        Generate embeddings for a list of document chunks using Mistral's API.
+        chunk_result: ChunkingResult,
+        usage_tracker: TokenUsageTracker | None = None,
+    ) -> EmbeddingResult:
+        """Orchestrate the Mistral embedding flow."""
 
-        Args:
-            chunks: List of chunk dictionaries with chunk_text field
-            usage_tracker: Optional tracker for token usage
-
-        Returns:
-            The chunks with embeddings added
-        """
+        chunks = chunk_result.chunks
         if not chunks:
             self.logger.warning("No chunks to embed")
-            return chunks
+            return self._empty_embedding_result()
 
-        # Extract texts from chunks
-        chunk_texts = [chunk["chunk_text"] for chunk in chunks]
+        try:
+            texts = self._extract_texts(chunks)
+            response = self._call_mistral_embeddings(texts)
+            return self._build_embedding_result(
+                chunks, response, usage_tracker
+            )
+        except Exception as e:
+            self.logger.error(f"Error generating embeddings: {e}")
+            return self._empty_embedding_result(chunks)
 
-        self.logger.info(
-            f"Generating embeddings for {len(chunk_texts)} chunks"
+    # ------------------------------------------------------------------
+    # Helpers
+    def _extract_texts(
+        self,
+        chunks: list[ChunkWithEmbedding | any],
+    ) -> list[str]:
+        """Extract raw text from chunks."""
+        return [c.text for c in chunks]
+
+    def _call_mistral_embeddings(self, texts: list[str]):
+        """Call the Mistral embeddings API and return the raw response."""
+        self.logger.info("Requesting embeddings from Mistral API")
+        return self.client.embeddings.create(model=self.model, inputs=texts)
+
+    def _build_embedding_result(
+        self,
+        chunks,
+        response,
+        usage_tracker: TokenUsageTracker | None = None,
+    ) -> EmbeddingResult:
+        """Convert API response into EmbeddingResult."""
+
+        embedded_chunks: list[ChunkWithEmbedding] = []
+        for i, data in enumerate(response.data):
+            embedded_chunks.append(
+                ChunkWithEmbedding(
+                    text=chunks[i].text,
+                    metadata=chunks[i].metadata,
+                    embedding=list(data.embedding),
+                    embedding_model=self.model,
+                )
+            )
+
+        if usage_tracker:
+            usage_tracker.add_embedding_tokens(
+                response.usage.prompt_tokens, self.model
+            )
+
+        return EmbeddingResult(
+            processed_at=response.created,
+            chunks_with_embeddings=embedded_chunks,
+            model_name=self.model,
+            metrics=usage_tracker.get_summary() if usage_tracker else None,
         )
 
-        # Call Mistral API to get embeddings
-        try:
-            response = self.client.embeddings.create(
-                model=self.model,
-                inputs=chunk_texts,
-            )
+    def _empty_embedding_result(
+        self, chunks: list | None = None
+    ) -> EmbeddingResult:
+        """Return an EmbeddingResult with no embeddings (error fallback)."""
 
-            # Track token usage if a tracker is provided
-            if usage_tracker:
-                usage_tracker.add_embedding_tokens(
-                    response.usage.prompt_tokens,
-                    self.model
+        empty_embeds: list[ChunkWithEmbedding] = []
+        for c in (chunks or []):
+            empty_embeds.append(
+                ChunkWithEmbedding(
+                    text=c.text if hasattr(c, "text") else "",
+                    metadata=c.metadata if hasattr(c, "metadata") else None,
+                    embedding=[],
+                    embedding_model=self.model,
                 )
-
-            # Add embeddings to chunks
-            for i, embedding_data in enumerate(response.data):
-                # Convert embedding to numpy array for easier manipulation
-                embedding_array = np.array(embedding_data.embedding)
-                chunks[i]["embedding"] = embedding_array
-                chunks[i]["embedding_model"] = self.model
-
-            self.logger.info(
-                f"Successfully generated {len(response.data)} embeddings"
             )
 
-        except Exception as e:
-            self.logger.error(f"Error generating embeddings: {str(e)}")
-            # Add empty embeddings to avoid breaking downstream code
-            for chunk in chunks:
-                chunk["embedding"] = None
-                chunk["embedding_model"] = self.model
-                chunk["embedding_error"] = str(e)
-
-        return chunks
+        return EmbeddingResult(
+            processed_at=None,
+            chunks_with_embeddings=empty_embeds,
+            model_name=self.model,
+            metrics=None,
+        )
