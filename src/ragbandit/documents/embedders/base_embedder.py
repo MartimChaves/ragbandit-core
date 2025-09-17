@@ -1,8 +1,14 @@
 from abc import ABC, abstractmethod
 
+# Third-party
 import numpy as np
 
-from ragbandit.schema import ExtendedOCRResponse
+# Project
+from ragbandit.schema import (
+    ProcessingResult,
+    ChunkingResult,
+    EmbeddingResult,
+)
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
@@ -31,39 +37,44 @@ class BaseEmbedder(ABC):
     @abstractmethod
     def embed_chunks(
         self,
-        chunks: list[dict[str, any]],
-        usage_tracker: TokenUsageTracker | None = None
-    ) -> list[dict[str, any]]:
+        chunk_result: ChunkingResult,
+        usage_tracker: TokenUsageTracker | None = None,
+    ) -> EmbeddingResult:
         """
-        Generate embeddings for a list of document chunks.
+        Generate embeddings for a ChunkingResult.
 
         Args:
-            chunks: List of chunk dictionaries with chunk_text field
+            chunk_result: The ChunkingResult whose chunks will be embedded
             usage_tracker: Optional tracker for token usage
 
         Returns:
-            The chunks with embeddings added
+            An EmbeddingResult containing embedded chunks
         """
         raise NotImplementedError
 
     def extend_response(
-        self, response: ExtendedOCRResponse, chunks: list[dict[str, any]]
-    ) -> ExtendedOCRResponse:
+        self,
+        response: ProcessingResult,
+        embedding_result: EmbeddingResult,
+    ) -> ProcessingResult:
         """
         Extend the response with embedding metadata.
 
         Args:
-            response: The ExtendedOCRResponse to extend
-            chunks: The chunks with embeddings
+            response: ProcessingResult to attach metadata to
+            embedding_result: The embedding results to log
 
         Returns:
             The extended response
         """
-        # Store embedding metadata in processing_metadata
-        response.processing_metadata[str(self)] = {
+        # Store embedding metadata in extracted_data
+        if response.extracted_data is None:
+            response.extracted_data = {}
+
+        response.extracted_data[str(self)] = {
             "embedder": self.name,
-            "chunk_count": len(chunks),
-            "has_embeddings": all("embedding" in chunk for chunk in chunks)
+            "chunk_count": len(embedding_result.chunks_with_embeddings),
+            "model": embedding_result.model_name,
         }
 
         return response
