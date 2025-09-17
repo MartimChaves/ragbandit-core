@@ -9,7 +9,9 @@ import logging
 import traceback
 from datetime import datetime, timezone
 
-from ragbandit.schema import OCRResult, ProcessingResult, ProcessedPage
+from ragbandit.schema import (
+    OCRResult, ProcessingResult, ProcessedPage, ChunkingResult
+)
 
 from ragbandit.documents.ocr import BaseOCR
 from ragbandit.documents.processors.base_processor import BaseProcessor
@@ -182,35 +184,30 @@ class DocumentPipeline:
 
     def run_chunker(
         self,
-        extended_response: ProcessingResult,
+        proc_result: ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> list[dict[str, any]]:
+    ) -> ChunkingResult:
         """Chunk the document using the configured chunker.
 
         Args:
-            extended_response: The extended OCR response to chunk
+            proc_result: The ProcessingResult to chunk
             usage_tracker: Optional token usage tracker
 
         Returns:
-            A list of chunk dictionaries
+            A ChunkingResult object
         """
         usage_tracker = usage_tracker or TokenUsageTracker()
         self.logger.info(f"Running chunker: {self.chunker}")
 
         try:
-            # Generate initial chunks
-            chunks = self.chunker.chunk(extended_response, usage_tracker)
+            # Generate chunks via chunker -> returns ChunkingResult
+            chunk_result = self.chunker.chunk(proc_result, usage_tracker)
             self.logger.info(
-                f"Initial chunking completed, created {len(chunks)} chunks"
+                "Chunking completed, created "
+                f"{len(chunk_result.chunks)} chunks"
             )
 
-            # Process chunks (e.g., merge small chunks)
-            chunks = self.chunker.process_chunks(chunks)
-            self.logger.info(
-                f"Chunk processing completed, final chunk count: {len(chunks)}"
-            )
-
-            return chunks
+            return chunk_result
         except Exception as e:
             error_traceback = traceback.format_exc()
             self.logger.error(
@@ -340,20 +337,23 @@ class DocumentPipeline:
                 return extended_response
 
             # Step 3: Chunking (if enabled)
-            chunks = None
+            chunk_result = None
             if run_chunking:
                 self.logger.info("Starting document chunking")
                 try:
-                    chunks = self.run_chunker(extended_response, usage_tracker)
+                    chunk_result = self.run_chunker(
+                        extended_response, usage_tracker
+                    )
                     # Store chunks in metadata
                     if extended_response.extracted_data is None:
                         extended_response.extracted_data = {}
                     extended_response.extracted_data["chunks"] = {
-                        "count": len(chunks),
+                        "count": len(chunk_result.chunks),
                         "chunker": str(self.chunker),
                     }
                     self.logger.info(
-                        f"Chunking completed with {len(chunks)} chunks"
+                        "Chunking completed with "
+                        f"{len(chunk_result.chunks)} chunks"
                     )
                 except Exception as e:
                     self.logger.error(f"Chunking failed: {e}")
@@ -366,11 +366,11 @@ class DocumentPipeline:
                     run_embedding = False
 
             # Step 4: Embedding (if enabled and chunks are available)
-            if run_embedding and chunks:
+            if run_embedding and chunk_result:
                 self.logger.info("Starting chunk embedding")
                 try:
                     extended_response = self.run_embedder(
-                        chunks, extended_response, usage_tracker
+                        chunk_result.chunks, extended_response, usage_tracker
                     )
                     self.logger.info("Embedding completed successfully")
                 except Exception as e:
