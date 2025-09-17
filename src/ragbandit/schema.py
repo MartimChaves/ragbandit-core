@@ -192,12 +192,6 @@ class Chunk(BaseModel):
     metadata: ChunkMetadata
 
 
-class ChunkWithEmbedding(Chunk):
-    """Represents a chunk that has been embedded."""
-    embedding: list[float]
-    embedding_model: str
-
-
 class ChunkingResult(BaseModel):
     """Represents the output of the chunking process."""
     processed_at: datetime
@@ -208,6 +202,12 @@ class ChunkingResult(BaseModel):
 ##########################################
 #                Embedding               #
 ##########################################
+
+
+class ChunkWithEmbedding(Chunk):
+    """Represents a chunk that has been embedded."""
+    embedding: list[float]
+    embedding_model: str
 
 
 class EmbeddingResult(BaseModel):
