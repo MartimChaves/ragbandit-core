@@ -49,7 +49,7 @@ class FootnoteProcessor(BaseProcessor):
         self,
         document: OCRResult | ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ProcessingResult, dict]:
+    ) -> ProcessingResult:
         """Process OCR pages to detect and handle footnotes.
 
         Args:
@@ -68,7 +68,14 @@ class FootnoteProcessor(BaseProcessor):
             proc_input, usage_tracker
         )
 
-        return proc_result, footnote_refs
+        # Embed footnote references into extracted_data for downstream use
+        if footnote_refs:
+            if proc_result.extracted_data is None:
+                proc_result.extracted_data = {}
+
+            proc_result.extracted_data["footnote_refs"] = footnote_refs
+
+        return proc_result
 
     def process_footnotes(
         self,
@@ -342,22 +349,3 @@ class FootnoteProcessor(BaseProcessor):
                     + markdown[(line_start_index + len(line)):]
                 )
         return markdown
-
-    def extend_response(
-        self,
-        response: ProcessingResult,
-        metadata: dict,
-    ) -> None:
-        """Extend the response with footnote references metadata.
-
-        Args:
-            response: ProcessingResult to update
-            metadata: Footnote references extracted during processing
-        """
-        if metadata:
-            if response.extracted_data is None:
-                response.extracted_data = {}
-
-            response.extracted_data[self.__repr__()] = metadata
-
-        return response

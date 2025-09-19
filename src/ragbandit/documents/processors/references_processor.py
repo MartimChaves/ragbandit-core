@@ -40,7 +40,7 @@ class ReferencesProcessor(BaseProcessor):
         self,
         document: OCRResult | ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ProcessingResult, str]:
+    ) -> ProcessingResult:
         """Process OCR pages to detect and remove references.
 
         Args:
@@ -60,7 +60,16 @@ class ReferencesProcessor(BaseProcessor):
             proc_input, usage_tracker
         )
 
-        return proc_result, references_markdown
+        # Save extracted references into processing result metadata
+        if references_markdown:
+            if proc_result.extracted_data is None:
+                proc_result.extracted_data = {}
+
+            proc_result.extracted_data["references_markdown"] = (
+                references_markdown
+            )
+
+        return proc_result
 
     def find_best_match(
         self, target: str, string_list: list[str]
@@ -395,20 +404,3 @@ class ReferencesProcessor(BaseProcessor):
             proc_result.pages[page_index].markdown = ""
 
         return proc_result, references_markdown
-
-    def extend_response(
-        self, response: ProcessingResult, metadata: object
-    ) -> None:
-        """Extend the response with references metadata.
-
-        Args:
-            response: ProcessingResult to update
-            metadata: References markdown extracted during processing
-        """
-        if metadata:
-            if response.extracted_data is None:
-                response.extracted_data = {}
-
-            response.extracted_data[self.__repr__()] = metadata
-
-        return response

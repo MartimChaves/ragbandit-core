@@ -32,7 +32,7 @@ class BaseProcessor(ABC):
         self,
         document: OCRResult | ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ProcessingResult, dict[str, any]]:
+    ) -> ProcessingResult:
         """
         Do one step of work and return:
           * a (possibly modified) ProcessingResult
@@ -45,30 +45,8 @@ class BaseProcessor(ABC):
             usage_tracker: Optional token usage tracker
         """
         raise NotImplementedError
+
     # ----------------------------------------------------------------------
-
-    # default implementation
-    def extend_response(
-        self,
-        response: ProcessingResult,
-        metadata: dict[str, any],
-    ) -> None:
-        """Utility to merge processor-specific metadata into the result object.
-
-        By default this updates the `extracted_data` field of
-        the `ProcessingResult` so that downstream processors have access
-        to the information. Sub-classes can override this if
-        they need more sophisticated behaviour.
-        """
-
-        # Lazily initialise extracted_data to an empty dict if it is None
-        if response.extracted_data is None:
-            response.extracted_data = {}
-
-        response.extracted_data.update(metadata)
-
-        return response
-
     def __str__(self) -> str:
         """Return a string representation of the processor."""
         return self.__class__.__name__
