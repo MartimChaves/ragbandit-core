@@ -2,6 +2,7 @@
 from mistralai import OCRResponse
 from pydantic import BaseModel, RootModel
 from datetime import datetime
+from enum import Enum
 
 
 class ProcessorConfig(BaseModel):
@@ -90,7 +91,7 @@ class TokenUsageMetrics(BaseModel):
 
 class TimingMetrics(BaseModel):
     """Metrics for pipeline step durations in seconds."""
-    total_duration: float
+    total_duration: float | None = None
     ocr: float | None = None
     processing_steps: list[dict[str, float]] | None = None
     chunking: float | None = None
@@ -222,6 +223,19 @@ class EmbeddingResult(BaseModel):
 ##########################################
 
 
+class StepStatus(str, Enum):
+    success = "success"
+    failed = "failed"
+    skipped = "skipped"
+
+
+class StepReport(BaseModel):
+    ocr: StepStatus | None = None
+    processing: StepStatus | None = None
+    chunking: StepStatus | None = None
+    embedding: StepStatus | None = None
+
+
 class DocumentPipelineResult(BaseModel):
     """The composite result for an end-to-end pipeline run."""
     source_file_path: str
@@ -229,7 +243,7 @@ class DocumentPipelineResult(BaseModel):
     pipeline_config: dict
     timings: TimingMetrics
     total_metrics: list[TokenUsageMetrics]
-    ocr_result: OCRResult
-    processing_result: ProcessingResult
+    ocr_result: OCRResult | None = None
+    processing_result: ProcessingResult | None = None
     chunking_result: ChunkingResult | None = None
     embedding_result: EmbeddingResult | None = None
