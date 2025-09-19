@@ -5,7 +5,6 @@ import numpy as np
 
 # Project
 from ragbandit.schema import (
-    ProcessingResult,
     ChunkingResult,
     EmbeddingResult,
 )
@@ -51,33 +50,6 @@ class BaseEmbedder(ABC):
             An EmbeddingResult containing embedded chunks
         """
         raise NotImplementedError
-
-    def extend_response(
-        self,
-        response: ProcessingResult,
-        embedding_result: EmbeddingResult,
-    ) -> ProcessingResult:
-        """
-        Extend the response with embedding metadata.
-
-        Args:
-            response: ProcessingResult to attach metadata to
-            embedding_result: The embedding results to log
-
-        Returns:
-            The extended response
-        """
-        # Store embedding metadata in extracted_data
-        if response.extracted_data is None:
-            response.extracted_data = {}
-
-        response.extracted_data[str(self)] = {
-            "embedder": self.name,
-            "chunk_count": len(embedding_result.chunks_with_embeddings),
-            "model": embedding_result.model_name,
-        }
-
-        return response
 
     def cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
         """
