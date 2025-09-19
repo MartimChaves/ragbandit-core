@@ -143,36 +143,6 @@ class BaseChunker(ABC):
         """
         return chunks
 
-    def extend_response(
-        self,
-        response: ProcessingResult,
-        chunking_result: ChunkingResult,
-    ) -> ProcessingResult:
-        """
-        Extend the response with chunk metadata.
-
-        Args:
-            response: ProcessingResult to update
-            chunking_result: The result produced by this chunker
-
-        Returns:
-            Updated ProcessingResult
-        """
-        if response.extracted_data is None:
-            response.extracted_data = {}
-
-        response.extracted_data[self.__repr__()] = {
-            "chunk_count": len(chunking_result.chunks),
-            "chunks": [c.model_dump() for c in chunking_result.chunks],
-            "metrics": (
-                chunking_result.metrics.model_dump()
-                if chunking_result.metrics
-                else None
-            ),
-        }
-
-        return response
-
     # ------------------------------------------------------------------
     # Shared helpers
     def attach_images(
