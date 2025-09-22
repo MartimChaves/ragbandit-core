@@ -221,21 +221,17 @@ class DocumentPipeline:
     def process(
         self,
         pdf_filepath: str,
-        run_chunking: bool = True,
-        run_embedding: bool = True,
     ) -> DocumentPipelineResult:
         """Process a document through the complete pipeline.
 
         This method orchestrates the entire document processing pipeline:
         1. OCR processing
         2. Document processors (footnotes, references, etc.)
-        3. Chunking (optional)
-        4. Embedding (optional)
+        3. Chunking
+        4. Embedding
 
         Args:
             pdf_filepath: Path to the PDF file to process
-            run_chunking: Whether to run the chunking step
-            run_embedding: Whether to run the embedding step
 
         Returns:
             A DocumentPipelineResult with all processing results
@@ -287,38 +283,36 @@ class DocumentPipeline:
                 dpr.step_report.processing = StepStatus.failed
                 return dpr
 
-            # Step 3: Chunking (if enabled)
-            if run_chunking:
-                self.logger.info("Starting document chunking")
-                try:
-                    chunk_result = self.run_chunker(
-                        processing_result, usage_tracker
-                    )
-                    self.logger.info(
-                        "Chunking completed with "
-                        f"{len(chunk_result.chunks)} chunks"
-                    )
-                    dpr.chunking_result = chunk_result
-                    dpr.step_report.chunking = StepStatus.success
-                except Exception as e:
-                    self.logger.error(f"Chunking failed: {e}")
-                    dpr.step_report.chunking = StepStatus.failed
-                    dpr.chunking_result = None
-                    run_embedding = False
+            # Step 3: Chunking
+            self.logger.info("Starting document chunking")
+            try:
+                chunk_result = self.run_chunker(
+                    processing_result, usage_tracker
+                )
+                self.logger.info(
+                    "Chunking completed with "
+                    f"{len(chunk_result.chunks)} chunks"
+                )
+                dpr.chunking_result = chunk_result
+                dpr.step_report.chunking = StepStatus.success
+            except Exception as e:
+                self.logger.error(f"Chunking failed: {e}")
+                dpr.step_report.chunking = StepStatus.failed
+                return dpr
 
-            # Step 4: Embedding (if enabled and chunks are available)
-            if run_embedding and dpr.chunking_result:
-                self.logger.info("Starting chunk embedding")
-                try:
-                    embedding_result = self.run_embedder(
-                        dpr.chunking_result, usage_tracker
-                    )
-                    self.logger.info("Embedding completed successfully")
-                    dpr.embedding_result = embedding_result
-                    dpr.step_report.embedding = StepStatus.success
-                except Exception as e:
-                    self.logger.error(f"Embedding failed: {e}")
-                    dpr.step_report.embedding = StepStatus.failed
+            # Step 4: Embedding (execute only if chunks are available)
+            self.logger.info("Starting chunk embedding")
+            try:
+                embedding_result = self.run_embedder(
+                    dpr.chunking_result, usage_tracker
+                )
+                self.logger.info("Embedding completed successfully")
+                dpr.embedding_result = embedding_result
+                dpr.step_report.embedding = StepStatus.success
+            except Exception as e:
+                self.logger.error(f"Embedding failed: {e}")
+                dpr.step_report.embedding = StepStatus.failed
+                return dpr
 
             dpr.total_metrics.append(usage_tracker.get_summary())
 
