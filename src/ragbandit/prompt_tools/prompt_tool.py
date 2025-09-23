@@ -21,8 +21,8 @@ class PromptTool(Generic[T]):
         output_schema: type[T],
         model: str = "mistral-small-latest",
         temperature: float = 0,
-        preprocess_fn: Callable[[dict[str, any]], dict[str, any]] = None,
-        postprocess_fn: Callable[[T], any] = None,
+        preprocess_fn: Callable[[dict[str, object]], dict[str, object]] = None,
+        postprocess_fn: Callable[[T], object] = None,
     ):
         """Initialize a new prompt-based tool.
 
@@ -63,7 +63,7 @@ class PromptTool(Generic[T]):
         api_key: str,
         usage_tracker: TokenUsageTracker | None = None,
         **kwargs
-    ) -> any:
+    ) -> object:
         """Execute the tool with the given variables.
 
         Args:
@@ -100,8 +100,8 @@ def create_prompt_tool(
     output_schema: type[T],
     model: str = "mistral-small-latest",
     temperature: float = 0,
-    preprocess_fn: Callable[[dict[str, any]], dict[str, any]] = None,
-    postprocess_fn: Callable[[T], any] = None,
+    preprocess_fn: Callable[[dict[str, object]], dict[str, object]] = None,
+    postprocess_fn: Callable[[T], object] = None,
 ) -> PromptTool[T]:
     """Create a new prompt-based tool with the given template and schema.
 

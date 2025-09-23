@@ -63,7 +63,7 @@ class MistralEmbedder(BaseEmbedder):
     # Helpers
     def _extract_texts(
         self,
-        chunks: list[ChunkWithEmbedding | any],
+        chunks: list[ChunkWithEmbedding | object],
     ) -> list[str]:
         """Extract raw text from chunks."""
         return [c.text for c in chunks]

@@ -170,7 +170,7 @@ class ProcessingResult(BaseModel):
     processed_at: datetime
     pages: list[ProcessedPage]  # The text content, now structured per page
     processing_trace: list[ProcessingTraceItem]
-    extracted_data: dict[str, any]  # For footnotes, references, etc.
+    extracted_data: dict[str, object]  # For footnotes, references, etc.
     metrics: list[TokenUsageMetrics] | None = None
 
 ##########################################
@@ -184,7 +184,7 @@ class ChunkMetadata(BaseModel):
     source_references: list[str] | None = None
     footnotes: list[dict] | None = None
     images: list[Image] | None = None
-    extra: dict[str, any] = {}
+    extra: dict[str, object] = {}
 
 
 class Chunk(BaseModel):
