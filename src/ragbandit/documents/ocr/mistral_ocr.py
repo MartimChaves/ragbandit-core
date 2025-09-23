@@ -86,17 +86,28 @@ class MistralOCRDocument(BaseOCR):
             images = []
             if page.images:
                 for img in page.images:
-                    images.append(Image.model_validate(img))
+                    images.append(
+                        Image.model_validate(
+                            img,
+                            from_attributes=True,
+                        )
+                    )
 
             ocr_page = OCRPage(
                 index=i,
                 markdown=page.markdown,
                 images=images,
-                dimensions=PageDimensions.model_validate(page.dimensions),
+                dimensions=PageDimensions.model_validate(
+                    page.dimensions,
+                    from_attributes=True,
+                ),
             )
             pages.append(ocr_page)
 
-        usage_info = OCRUsageInfo.model_validate(ocr_response.usage_info)
+        usage_info = OCRUsageInfo.model_validate(
+            ocr_response.usage_info,
+            from_attributes=True,
+        )
 
         result = OCRResult(
             source_file_path=pdf_filepath,
