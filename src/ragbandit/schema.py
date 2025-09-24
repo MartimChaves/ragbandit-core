@@ -89,6 +89,13 @@ class TokenUsageMetrics(BaseModel):
     completion_cost: float | None = None
 
 
+class PagesProcessedMetrics(BaseModel):
+    """Metrics for pages processed and associated cost."""
+    pages_processed: int
+    cost_per_page: float
+    total_cost: float
+
+
 class TimingMetrics(BaseModel):
     """Metrics for pipeline step durations in seconds."""
     total_duration: float | None = None
@@ -145,7 +152,8 @@ class OCRResult(BaseModel):
     document_annotation: str | None = None
     pages: list[OCRPage]
     usage_info: OCRUsageInfo
-    metrics: TokenUsageMetrics | None = None  # If OCR uses an LLM
+    # Metrics for OCR; can include token-usage or page-processing metrics
+    metrics: list[TokenUsageMetrics | PagesProcessedMetrics] | None = None
 
 ##########################################
 #               Processing               #
