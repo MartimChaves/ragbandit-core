@@ -173,7 +173,7 @@ class SemanticChunker(BaseChunker):
         return ChunkingResult(
             processed_at=datetime.now(timezone.utc),
             chunks=chunks,
-            metrics=None,
+            metrics=usage_tracker.get_summary() if usage_tracker else None,
         )
 
     def process_chunks(
