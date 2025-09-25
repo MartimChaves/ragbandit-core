@@ -83,5 +83,5 @@ class BaseProcessor(ABC):
             pages=pages_processed,
             processing_trace=[],
             extracted_data={},
-            metrics=[],
+            metrics=None,
         )
