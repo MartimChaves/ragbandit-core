@@ -68,14 +68,13 @@ class BaseProcessor(ABC):
         that downstream logic can assume a consistent type.
         """
 
-        if isinstance(document, ProcessingResult):
-            # Ensure the processor name reflects the current processor
-            document.processor_name = str(self)
-            return document
+        # Always create a fresh ProcessingResult so that timestamps, metrics,
+        # and extracted data do not roll over between processors.
 
-        # Convert OCRResult → ProcessingResult (shallow conversion)
+        source_pages = document.pages if hasattr(document, "pages") else []
+
         pages_processed = [
-            ProcessedPage(**page.model_dump()) for page in document.pages
+            ProcessedPage(**page.model_dump()) for page in source_pages
         ]
 
         return ProcessingResult(
