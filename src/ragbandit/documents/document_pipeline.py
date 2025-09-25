@@ -113,7 +113,7 @@ class DocumentPipeline:
                 proc_usage = TokenUsageTracker()
                 proc_result = processor.process(prev_result, proc_usage)
                 # Attach token usage summary to metrics
-                proc_result.metrics.append(proc_usage.get_summary())
+                proc_result.metrics = proc_usage.get_summary()
 
                 processing_results.append(proc_result)
                 prev_result = proc_result
@@ -134,18 +134,16 @@ class DocumentPipeline:
     def run_chunker(
         self,
         proc_result: ProcessingResult,
-        usage_tracker: TokenUsageTracker | None = None,
     ) -> ChunkingResult:
         """Chunk the document using the configured chunker.
 
         Args:
             proc_result: The ProcessingResult to chunk
-            usage_tracker: Optional token usage tracker
 
         Returns:
             A ChunkingResult object
         """
-        usage_tracker = usage_tracker or TokenUsageTracker()
+        usage_tracker = TokenUsageTracker()
         self.logger.info(f"Running chunker: {self.chunker}")
 
         try:
@@ -168,7 +166,6 @@ class DocumentPipeline:
     def run_embedder(
         self,
         chunk_result: ChunkingResult,
-        usage_tracker: TokenUsageTracker | None = None,
     ) -> EmbeddingResult:
         """Embed chunks using the configured embedder.
 
@@ -179,7 +176,7 @@ class DocumentPipeline:
         Returns:
             An EmbeddingResult containing embeddings for each chunk
         """
-        usage_tracker = usage_tracker or TokenUsageTracker()
+        usage_tracker = TokenUsageTracker()
         self.logger.info(f"Running embedder: {self.embedder}")
 
         try:
@@ -232,13 +229,12 @@ class DocumentPipeline:
         Raises:
             Exception: If any critical step in the pipeline fails
         """
-        # Create trackers and the pipeline result object we will fill
-        usage_tracker = TokenUsageTracker()
-
+        # Create the pipeline result object we will fill
         dpr = DocumentPipelineResult(
             source_file_path=pdf_filepath,
             processed_at=datetime.now(timezone.utc),
             pipeline_config={
+                "ocr": str(self.ocr_processor) if self.ocr_processor else None,
                 "processors": [str(p) for p in self.processors],
                 "chunker": str(self.chunker) if self.chunker else None,
                 "embedder": str(self.embedder) if self.embedder else None,
@@ -256,6 +252,7 @@ class DocumentPipeline:
                 self.logger.info("OCR processing completed")
                 dpr.ocr_result = ocr_result
                 dpr.step_report.ocr = StepStatus.success
+                dpr.total_metrics.extend(ocr_result.metrics)
             except Exception as e:
                 self.logger.error(f"OCR processing failed: {e}")
                 dpr.step_report.ocr = StepStatus.failed
@@ -268,6 +265,9 @@ class DocumentPipeline:
                 self.logger.info("Document processors completed")
                 dpr.processing_results = processing_results
                 dpr.step_report.processing = StepStatus.success
+                dpr.total_metrics.extend(
+                    pr.metrics for pr in processing_results
+                )
             except Exception as e:
                 self.logger.error(f"Document processors failed: {e}")
                 dpr.step_report.processing = StepStatus.failed
@@ -276,15 +276,14 @@ class DocumentPipeline:
             # Step 3: Chunking
             self.logger.info("Starting document chunking")
             try:
-                chunk_result = self.run_chunker(
-                    processing_results[-1], usage_tracker
-                )
+                chunk_result = self.run_chunker(processing_results[-1])
                 self.logger.info(
                     "Chunking completed with "
                     f"{len(chunk_result.chunks)} chunks"
                 )
                 dpr.chunking_result = chunk_result
                 dpr.step_report.chunking = StepStatus.success
+                dpr.total_metrics.extend(chunk_result.metrics)
             except Exception as e:
                 self.logger.error(f"Chunking failed: {e}")
                 dpr.step_report.chunking = StepStatus.failed
@@ -293,30 +292,32 @@ class DocumentPipeline:
             # Step 4: Embedding (execute only if chunks are available)
             self.logger.info("Starting chunk embedding")
             try:
-                embedding_result = self.run_embedder(
-                    dpr.chunking_result, usage_tracker
-                )
+                embedding_result = self.run_embedder(chunk_result)
                 self.logger.info("Embedding completed successfully")
                 dpr.embedding_result = embedding_result
                 dpr.step_report.embedding = StepStatus.success
+                dpr.total_metrics.extend(embedding_result.metrics)
             except Exception as e:
                 self.logger.error(f"Embedding failed: {e}")
                 dpr.step_report.embedding = StepStatus.failed
                 return dpr
 
-            dpr.total_metrics.append(usage_tracker.get_summary())
+            # Aggregate total cost across all metrics collected
+            dpr.total_cost_usd = sum(
+                m.total_cost_usd
+                for m in dpr.total_metrics
+                if m and getattr(m, "total_cost_usd", None) is not None
+            )
 
             self.logger.info("Document processing completed for document.")
-            dpr.timings.total_duration = usage_tracker.stopwatch_total()
+            # dpr.timings.total_duration = usage_tracker.stopwatch_total()
             return dpr
 
         finally:
             # Capture transcript logs regardless of success or early return
             try:
                 logs_dump = self._transcript.dump()
-                if getattr(dpr, 'extra', None) is None:
-                    dpr.extra = {}
-                dpr.extra["logs"] = logs_dump
+                dpr.logs = logs_dump
             finally:
                 # Always remove the handler when done
                 logging.getLogger().removeHandler(self._transcript)
