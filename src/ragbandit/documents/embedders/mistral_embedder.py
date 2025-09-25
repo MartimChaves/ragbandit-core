@@ -6,6 +6,7 @@ from ragbandit.schema import (
     EmbeddingResult,
     ChunkWithEmbedding,
 )
+from datetime import datetime, timezone
 
 
 class MistralEmbedder(BaseEmbedder):
@@ -98,7 +99,7 @@ class MistralEmbedder(BaseEmbedder):
             )
 
         return EmbeddingResult(
-            processed_at=response.created,
+            processed_at=datetime.now(timezone.utc),
             chunks_with_embeddings=embedded_chunks,
             model_name=self.model,
             metrics=usage_tracker.get_summary() if usage_tracker else None,
