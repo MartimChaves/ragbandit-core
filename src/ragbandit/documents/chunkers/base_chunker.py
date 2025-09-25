@@ -97,8 +97,13 @@ class BaseChunker(ABC):
                     current_chunk.text += (" " + chunks[i + 1].text)
 
                     # Merge images if they exist
-                    if current_chunk.images and chunks[i + 1].images:
-                        current_chunk.images.extend(chunks[i + 1].images)
+                    if (
+                        current_chunk.metadata.images
+                        and chunks[i + 1].metadata.images
+                    ):
+                        current_chunk.metadata.images.extend(
+                            chunks[i + 1].metadata.images
+                        )
 
                     # We've used chunk i+1, so skip it
                     i += 2
@@ -113,8 +118,13 @@ class BaseChunker(ABC):
                         merged[-1].text += (" " + current_chunk.text)
 
                         # Merge images if they exist
-                        if merged[-1].images and current_chunk.images:
-                            merged[-1].images.extend(current_chunk.images)
+                        if (
+                            merged[-1].metadata.images
+                            and current_chunk.metadata.images
+                        ):
+                            merged[-1].metadata.images.extend(
+                                current_chunk.metadata.images
+                            )
                     else:
                         # If there's no previous chunk in 'merged', just add it
                         merged.append(current_chunk)
