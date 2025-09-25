@@ -119,7 +119,7 @@ class FixedSizeChunker(BaseChunker):
                 # Create the chunk
                 chunk_text = page_text[start:end]
                 meta = ChunkMetadata(
-                    page_number=page_index, images=[], extra={}
+                    page_index=page_index, images=[], extra={}
                     )
                 chunks.append(Chunk(text=chunk_text, metadata=meta))
 

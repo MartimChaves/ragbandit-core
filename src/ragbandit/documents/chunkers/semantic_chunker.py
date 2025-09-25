@@ -72,7 +72,7 @@ class SemanticChunker(BaseChunker):
             if break_lead == "NO_BREAK":
                 # This means the LLM found no break;
                 # treat the entire `full_text` as one chunk
-                meta = ChunkMetadata(page_number=i, images=[], extra={})
+                meta = ChunkMetadata(page_index=i, images=[], extra={})
                 chunks.append(Chunk(text=full_text, metadata=meta))
                 # Move to the next page
                 i += 1
@@ -103,7 +103,7 @@ class SemanticChunker(BaseChunker):
                     # If we still can't find the snippet after
                     # trying shorter versions,
                     # fallback: chunk everything as is
-                    meta = ChunkMetadata(page_number=i, images=[], extra={})
+                    meta = ChunkMetadata(page_index=i, images=[], extra={})
                     chunks.append(Chunk(text=full_text, metadata=meta))
                     i += 1
                     if i < len(pages):
@@ -114,7 +114,7 @@ class SemanticChunker(BaseChunker):
                     # We found a break
                     chunk_text = full_text[:idx]
                     remainder = full_text[idx:]
-                    meta = ChunkMetadata(page_number=i, images=[], extra={})
+                    meta = ChunkMetadata(page_index=i, images=[], extra={})
                     chunks.append(Chunk(text=chunk_text, metadata=meta))
 
                     # Now we see if remainder is too small
@@ -131,7 +131,7 @@ class SemanticChunker(BaseChunker):
                         # Possibly chunk the remainder if it's not empty
                         if len(full_text.strip()) > 0:
                             meta = ChunkMetadata(
-                                page_number=min(i, len(pages) - 1),
+                                page_index=min(i, len(pages) - 1),
                                 images=[],
                                 extra={},
                             )

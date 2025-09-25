@@ -166,7 +166,7 @@ class BaseChunker(ABC):
                 chunk.metadata.images = []
                 continue
 
-            page_idx = chunk.metadata.page_number
+            page_idx = chunk.metadata.page_index
             rel_images = proc_result.pages[page_idx].images or []
             chunk.metadata.images = []
 

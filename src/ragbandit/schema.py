@@ -188,7 +188,7 @@ class ProcessingResult(BaseModel):
 
 class ChunkMetadata(BaseModel):
     """Metadata associated with a chunk."""
-    page_number: int
+    page_index: int
     source_references: list[str] | None = None
     footnotes: list[dict] | None = None
     images: list[Image] | None = None
