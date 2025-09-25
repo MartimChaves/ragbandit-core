@@ -96,7 +96,7 @@ class MistralOCRDocument(BaseOCR):
         return PagesProcessedMetrics(
             pages_processed=len(pages),
             cost_per_page=cost_per_page,
-            total_cost=len(pages) * cost_per_page,
+            total_cost_usd=len(pages) * cost_per_page,
         )
 
     def _build_result(
