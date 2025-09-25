@@ -252,6 +252,6 @@ class DocumentPipelineResult(BaseModel):
     timings: TimingMetrics
     total_metrics: list[TokenUsageMetrics]
     ocr_result: OCRResult | None = None
-    processing_result: ProcessingResult | None = None
+    processing_results: list[ProcessingResult] | None = None
     chunking_result: ChunkingResult | None = None
     embedding_result: EmbeddingResult | None = None
