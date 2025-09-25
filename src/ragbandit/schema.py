@@ -101,7 +101,7 @@ class PagesProcessedMetrics(BaseModel):
     """Metrics for pages processed and associated cost."""
     pages_processed: int
     cost_per_page: float
-    total_cost: float
+    total_cost_usd: float
 
 
 class TimingMetrics(BaseModel):
@@ -187,7 +187,7 @@ class ProcessingResult(BaseModel):
     pages: list[ProcessedPage]  # The text content, now structured per page
     processing_trace: list[ProcessingTraceItem]
     extracted_data: dict[str, object]  # For footnotes, references, etc.
-    metrics: list[TokenUsageMetrics] | None = None
+    metrics: TokenUsageMetrics | None = None
 
 ##########################################
 #                Chunking                #
@@ -258,8 +258,13 @@ class DocumentPipelineResult(BaseModel):
     processed_at: datetime
     pipeline_config: dict
     timings: TimingMetrics
-    total_metrics: list[TokenUsageMetrics]
+    total_metrics: (
+        list[TokenUsageMetrics | PagesProcessedMetrics] | None
+    ) = None
+    total_cost_usd: float | None = None
     ocr_result: OCRResult | None = None
     processing_results: list[ProcessingResult] | None = None
     chunking_result: ChunkingResult | None = None
     embedding_result: EmbeddingResult | None = None
+    step_report: StepReport
+    logs: str | None = None
