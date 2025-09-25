@@ -125,3 +125,12 @@ class BaseOCR(ABC):
             OCRResult: The OCR result from the processor
         """
         raise NotImplementedError("Subclasses must implement process method")
+
+    # ----------------------------------------------------------------------
+    def __str__(self) -> str:
+        """Return a string representation of the OCR processor."""
+        return self.__class__.__name__
+
+    def __repr__(self) -> str:
+        """Return a string representation of the OCR processor."""
+        return f"{self.__class__.__name__}()"
