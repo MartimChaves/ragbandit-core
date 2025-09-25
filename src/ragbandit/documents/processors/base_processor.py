@@ -69,6 +69,8 @@ class BaseProcessor(ABC):
         """
 
         if isinstance(document, ProcessingResult):
+            # Ensure the processor name reflects the current processor
+            document.processor_name = str(self)
             return document
 
         # Convert OCRResult → ProcessingResult (shallow conversion)
@@ -77,7 +79,7 @@ class BaseProcessor(ABC):
         ]
 
         return ProcessingResult(
-            processor_name=self.__repr__(),
+            processor_name=str(self),
             processed_at=datetime.now(timezone.utc),
             pages=pages_processed,
             processing_trace=[],
