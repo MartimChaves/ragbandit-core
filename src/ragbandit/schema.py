@@ -79,14 +79,22 @@ class ChunksModel(BaseModel):
 
 
 class TokenUsageMetrics(BaseModel):
-    """Metrics for token usage and cost."""
-    model: str
+    """Aggregated token/cost usage metrics returned by TokenUsageTracker."""
+    total_calls: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_embedding_tokens: int
     total_tokens: int
-    prompt_tokens: int
-    completion_tokens: int
-    total_cost: float | None = None
-    prompt_cost: float | None = None
-    completion_cost: float | None = None
+    total_cost_usd: float
+
+    class ModelUsage(BaseModel):
+        calls: int
+        input_tokens: int | None = 0
+        output_tokens: int | None = 0
+        embedding_tokens: int | None = 0
+        cost: float
+
+    models: dict[str, ModelUsage]
 
 
 class PagesProcessedMetrics(BaseModel):
@@ -221,10 +229,10 @@ class ChunkWithEmbedding(Chunk):
 
 class EmbeddingResult(BaseModel):
     """Represents the output of the embedding process."""
-    processed_at: datetime
+    processed_at: datetime | None = None
     chunks_with_embeddings: list[ChunkWithEmbedding]
     model_name: str
-    metrics: TokenUsageMetrics
+    metrics: TokenUsageMetrics | None = None
 
 ##########################################
 #            Document Pipeline           #
