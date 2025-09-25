@@ -89,13 +89,11 @@ class DocumentPipeline:
     def run_processors(
         self,
         ocr_result: OCRResult,
-        usage_tracker: TokenUsageTracker | None = None,
     ) -> list[ProcessingResult]:
         """Process a document through the processors pipeline.
 
         Args:
             ocr_result: The initial OCR result to process
-            usage_tracker: Optional token usage tracker
 
         Returns:
             A list of ProcessingResult with additional metadata
@@ -107,36 +105,31 @@ class DocumentPipeline:
         # is responsible for converting it to ProcessingResult if needed.
         prev_result = ocr_result
 
-        try:
-            # Process the document through each processor in sequence
-            for processor in self.processors:
-                self.logger.info(f"Running processor: {processor}")
-                try:
-                    # Give each processor its own usage tracker
-                    proc_usage = TokenUsageTracker()
-                    proc_result = processor.process(prev_result, proc_usage)
-                    # Attach token usage summary to metrics
-                    proc_result.metrics.append(proc_usage.get_summary())
+        # Process the document through each processor in sequence
+        for processor in self.processors:
+            self.logger.info(f"Running processor: {processor}")
+            try:
+                # Give each processor its own usage tracker
+                proc_usage = TokenUsageTracker()
+                proc_result = processor.process(prev_result, proc_usage)
+                # Attach token usage summary to metrics
+                proc_result.metrics.append(proc_usage.get_summary())
 
-                    processing_results.append(proc_result)
-                    prev_result = proc_result
-                    self.logger.info(
-                        f"Processor {processor} completed successfully"
-                    )
-                except Exception as e:
-                    error_traceback = traceback.format_exc()
-                    self.logger.error(
-                        f"Error in processor {processor}: {e}\n"
-                        f"Traceback: {error_traceback}\n"
-                    )
-                    # Continue with the next processor
-                    continue
+                processing_results.append(proc_result)
+                prev_result = proc_result
+                self.logger.info(
+                    f"Processor {processor} completed successfully"
+                )
+            except Exception as e:
+                error_traceback = traceback.format_exc()
+                self.logger.error(
+                    f"Error in processor {processor}: {e}\n"
+                    f"Traceback: {error_traceback}\n"
+                )
+                # Continue with the next processor
+                continue
 
-            return processing_results
-        finally:
-            # We don't save logs or remove handlers here since
-            # that's handled by the process method
-            pass  # No special fallback; let caller handle failures
+        return processing_results
 
     def run_chunker(
         self,
@@ -271,12 +264,9 @@ class DocumentPipeline:
             # Step 2: Run processors
             self.logger.info("Starting document processors")
             try:
-                processing_results = self.run_processors(
-                    ocr_result, usage_tracker
-                )
+                processing_results = self.run_processors(ocr_result)
                 self.logger.info("Document processors completed")
-                processing_result = processing_results[-1]
-                dpr.processing_result = processing_result
+                dpr.processing_results = processing_results
                 dpr.step_report.processing = StepStatus.success
             except Exception as e:
                 self.logger.error(f"Document processors failed: {e}")
@@ -287,7 +277,7 @@ class DocumentPipeline:
             self.logger.info("Starting document chunking")
             try:
                 chunk_result = self.run_chunker(
-                    processing_result, usage_tracker
+                    processing_results[-1], usage_tracker
                 )
                 self.logger.info(
                     "Chunking completed with "
