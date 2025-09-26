@@ -8,6 +8,7 @@ of document processors in sequence, chunking, and embedding.
 import logging
 import traceback
 from datetime import datetime, timezone
+import time
 
 from ragbandit.schema import (
     OCRResult,
@@ -59,6 +60,8 @@ class DocumentPipeline:
         self.processors = processors or []
         self.chunker = chunker
         self.embedder = embedder
+        # list to hold per-processor timings captured in run_processors()
+        self._processing_timings: list[dict[str, float]] = []
 
         # Set up logging with more explicit configuration
         self.logger = logger or logging.getLogger(__name__)
@@ -100,6 +103,7 @@ class DocumentPipeline:
             from all processors
         """
         processing_results: list[ProcessingResult] = []
+        timings: list[dict[str, float]] = []
 
         # Start the processor chain with the raw OCRResult; each processor
         # is responsible for converting it to ProcessingResult if needed.
@@ -108,6 +112,7 @@ class DocumentPipeline:
         # Process the document through each processor in sequence
         for processor in self.processors:
             self.logger.info(f"Running processor: {processor}")
+            start_step = time.perf_counter()
             try:
                 # Give each processor its own usage tracker
                 proc_usage = TokenUsageTracker()
@@ -128,7 +133,13 @@ class DocumentPipeline:
                 )
                 # Continue with the next processor
                 continue
+            finally:
+                timings.append(
+                    {str(processor): time.perf_counter() - start_step}
+                )
 
+        # expose timings to be consumed by the outer process() function
+        self._processing_timings = timings
         return processing_results
 
     def run_chunker(
@@ -229,6 +240,8 @@ class DocumentPipeline:
         Raises:
             Exception: If any critical step in the pipeline fails
         """
+        # Record start of whole pipeline
+        start_total = time.perf_counter()
         # Create the pipeline result object we will fill
         dpr = DocumentPipelineResult(
             source_file_path=pdf_filepath,
@@ -247,15 +260,19 @@ class DocumentPipeline:
         try:
             # Step 1: OCR
             self.logger.info("Starting OCR processing.")
+            start_ocr = time.perf_counter()
             try:
                 ocr_result = self.run_ocr(pdf_filepath)
                 self.logger.info("OCR processing completed")
                 dpr.ocr_result = ocr_result
                 dpr.step_report.ocr = StepStatus.success
                 dpr.total_metrics.extend(ocr_result.metrics)
+                dpr.timings.ocr = time.perf_counter() - start_ocr
             except Exception as e:
                 self.logger.error(f"OCR processing failed: {e}")
                 dpr.step_report.ocr = StepStatus.failed
+                dpr.timings.ocr = time.perf_counter() - start_ocr
+                dpr.timings.total_duration = time.perf_counter() - start_total
                 return dpr
 
             # Step 2: Run processors
@@ -268,13 +285,17 @@ class DocumentPipeline:
                 dpr.total_metrics.extend(
                     pr.metrics for pr in processing_results
                 )
+                dpr.timings.processing_steps = self._processing_timings
             except Exception as e:
                 self.logger.error(f"Document processors failed: {e}")
                 dpr.step_report.processing = StepStatus.failed
+                dpr.timings.processing_steps = self._processing_timings
+                dpr.timings.total_duration = time.perf_counter() - start_total
                 return dpr
 
             # Step 3: Chunking
             self.logger.info("Starting document chunking")
+            start_chunk = time.perf_counter()
             try:
                 chunk_result = self.run_chunker(processing_results[-1])
                 self.logger.info(
@@ -284,22 +305,29 @@ class DocumentPipeline:
                 dpr.chunking_result = chunk_result
                 dpr.step_report.chunking = StepStatus.success
                 dpr.total_metrics.extend(chunk_result.metrics)
+                dpr.timings.chunking = time.perf_counter() - start_chunk
             except Exception as e:
                 self.logger.error(f"Chunking failed: {e}")
                 dpr.step_report.chunking = StepStatus.failed
+                dpr.timings.chunking = time.perf_counter() - start_chunk
+                dpr.timings.total_duration = time.perf_counter() - start_total
                 return dpr
 
             # Step 4: Embedding (execute only if chunks are available)
             self.logger.info("Starting chunk embedding")
+            start_embed = time.perf_counter()
             try:
                 embedding_result = self.run_embedder(chunk_result)
                 self.logger.info("Embedding completed successfully")
                 dpr.embedding_result = embedding_result
                 dpr.step_report.embedding = StepStatus.success
                 dpr.total_metrics.extend(embedding_result.metrics)
+                dpr.timings.embedding = time.perf_counter() - start_embed
             except Exception as e:
                 self.logger.error(f"Embedding failed: {e}")
                 dpr.step_report.embedding = StepStatus.failed
+                dpr.timings.embedding = time.perf_counter() - start_embed
+                dpr.timings.total_duration = time.perf_counter() - start_total
                 return dpr
 
             # Aggregate total cost across all metrics collected
@@ -310,7 +338,7 @@ class DocumentPipeline:
             )
 
             self.logger.info("Document processing completed for document.")
-            # dpr.timings.total_duration = usage_tracker.stopwatch_total()
+            dpr.timings.total_duration = time.perf_counter() - start_total
             return dpr
 
         finally:
