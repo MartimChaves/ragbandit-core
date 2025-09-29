@@ -62,7 +62,9 @@ class FootnoteProcessor(BaseProcessor):
             - Dictionary of footnote references by page
         """
         # Normalise input to ProcessingResult once, then delegate
-        proc_input = self._ensure_processing_result(document)
+        proc_input = self.ensure_processing_result(
+                        document, processor_name=str(self)
+                    )
 
         proc_result, footnote_refs = self.process_footnotes(
             proc_input, usage_tracker

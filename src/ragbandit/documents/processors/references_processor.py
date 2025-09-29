@@ -54,7 +54,9 @@ class ReferencesProcessor(BaseProcessor):
         """
 
         # Normalize input once
-        proc_input = self._ensure_processing_result(document)
+        proc_input = self.ensure_processing_result(
+                        document, processor_name=str(self)
+                    )
 
         proc_result, references_markdown = self.remove_refs(
             proc_input, usage_tracker

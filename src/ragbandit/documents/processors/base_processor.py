@@ -57,9 +57,10 @@ class BaseProcessor(ABC):
 
     # ----------------------------------------------------------------------
     # Utility helpers
-    def _ensure_processing_result(
-        self,
+    @staticmethod
+    def ensure_processing_result(
         document: OCRResult | ProcessingResult,
+        processor_name: str = "bootstrap",
     ) -> ProcessingResult:
         """Ensure the incoming `document` is a `ProcessingResult`.
 
@@ -78,7 +79,7 @@ class BaseProcessor(ABC):
         ]
 
         return ProcessingResult(
-            processor_name=str(self),
+            processor_name=processor_name,
             processed_at=datetime.now(timezone.utc),
             pages=pages_processed,
             processing_trace=[],
