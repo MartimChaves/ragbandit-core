@@ -108,7 +108,8 @@ class TimingMetrics(BaseModel):
     """Metrics for pipeline step durations in seconds."""
     total_duration: float | None = None
     ocr: float | None = None
-    processing_steps: list[dict[str, float]] | None = None
+    # processing_steps: list[dict[str, float]] | None = None
+    processing: float | None = None
     chunking: float | None = None
     embedding: float | None = None
 
@@ -187,6 +188,7 @@ class ProcessingResult(BaseModel):
     pages: list[ProcessedPage]  # The text content, now structured per page
     processing_trace: list[ProcessingTraceItem]
     extracted_data: dict[str, object]  # For footnotes, references, etc.
+    processing_duration: float | None = None
     metrics: TokenUsageMetrics | None = None
 
 ##########################################
