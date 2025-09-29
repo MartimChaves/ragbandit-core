@@ -8,8 +8,9 @@ of document processors in sequence, chunking, and embedding.
 import logging
 import traceback
 from datetime import datetime, timezone
+from typing import Callable
 import time
-
+from dataclasses import dataclass
 from ragbandit.schema import (
     OCRResult,
     ProcessingResult,
@@ -39,6 +40,12 @@ class DocumentPipeline:
     The pipeline also tracks token usage and costs for each document.
     """
 
+    @dataclass
+    class _PipelineStep:
+        key: str  # "ocr" | "processing" | "chunking" | "embedding"
+        run: Callable[[], object]
+        on_success: Callable[[object], None]
+
     def __init__(
         self,
         chunker: BaseChunker,
@@ -60,8 +67,6 @@ class DocumentPipeline:
         self.processors = processors or []
         self.chunker = chunker
         self.embedder = embedder
-        # list to hold per-processor timings captured in run_processors()
-        self._processing_timings: list[dict[str, float]] = []
 
         # Set up logging with more explicit configuration
         self.logger = logger or logging.getLogger(__name__)
@@ -89,6 +94,17 @@ class DocumentPipeline:
         if self._transcript not in root_logger.handlers:
             root_logger.addHandler(self._transcript)
 
+    def run_ocr(self, pdf_filepath: str) -> OCRResult:
+        """Perform OCR on a PDF file using the configured OCR processor.
+
+        Args:
+            pdf_filepath: Path to the PDF file to process
+
+        Returns:
+            OCRResult: The OCR result from the processor
+        """
+        return self.ocr_processor.process(pdf_filepath)
+
     def run_processors(
         self,
         ocr_result: OCRResult,
@@ -103,7 +119,6 @@ class DocumentPipeline:
             from all processors
         """
         processing_results: list[ProcessingResult] = []
-        timings: list[dict[str, float]] = []
 
         # Start the processor chain with the raw OCRResult; each processor
         # is responsible for converting it to ProcessingResult if needed.
@@ -112,39 +127,28 @@ class DocumentPipeline:
         # Process the document through each processor in sequence
         for processor in self.processors:
             self.logger.info(f"Running processor: {processor}")
-            start_step = time.perf_counter()
-            try:
-                # Give each processor its own usage tracker
-                proc_usage = TokenUsageTracker()
-                proc_result = processor.process(prev_result, proc_usage)
-                # Attach token usage summary to metrics
-                proc_result.metrics = proc_usage.get_summary()
 
-                processing_results.append(proc_result)
-                prev_result = proc_result
-                self.logger.info(
-                    f"Processor {processor} completed successfully"
-                )
-            except Exception as e:
-                error_traceback = traceback.format_exc()
-                self.logger.error(
-                    f"Error in processor {processor}: {e}\n"
-                    f"Traceback: {error_traceback}\n"
-                )
-                # Continue with the next processor
-                continue
-            finally:
-                timings.append(
-                    {str(processor): time.perf_counter() - start_step}
-                )
+            # Give each processor its own usage tracker
+            proc_usage = TokenUsageTracker()
 
-        # expose timings to be consumed by the outer process() function
-        self._processing_timings = timings
+            start_processing = time.perf_counter()
+            proc_result = processor.process(prev_result, proc_usage)
+            end_processing = time.perf_counter()
+
+            # Attach token usage summary to metrics
+            proc_result.metrics = proc_usage.get_summary()
+            proc_duration = end_processing - start_processing
+            proc_result.processing_duration = proc_duration
+
+            processing_results.append(proc_result)
+            prev_result = proc_result
+            self.logger.info(f"{processor} completed successfully")
+
         return processing_results
 
     def run_chunker(
         self,
-        proc_result: ProcessingResult,
+        doc: ProcessingResult | OCRResult,
     ) -> ChunkingResult:
         """Chunk the document using the configured chunker.
 
@@ -154,25 +158,15 @@ class DocumentPipeline:
         Returns:
             A ChunkingResult object
         """
+        proc_result = (
+            doc
+            if isinstance(doc, ProcessingResult)
+            else BaseProcessor.ensure_processing_result(doc)
+        )
         usage_tracker = TokenUsageTracker()
-        self.logger.info(f"Running chunker: {self.chunker}")
-
-        try:
-            # Generate chunks via chunker -> returns ChunkingResult
-            chunk_result = self.chunker.chunk(proc_result, usage_tracker)
-            self.logger.info(
-                "Chunking completed, created "
-                f"{len(chunk_result.chunks)} chunks"
-            )
-
-            return chunk_result
-        except Exception as e:
-            error_traceback = traceback.format_exc()
-            self.logger.error(
-                f"Error in chunker {self.chunker}: {e}\n"
-                f"Traceback: {error_traceback}\n"
-            )
-            raise
+        # Generate chunks via chunker -> returns ChunkingResult
+        chunk_result = self.chunker.chunk(proc_result, usage_tracker)
+        return chunk_result
 
     def run_embedder(
         self,
@@ -188,164 +182,127 @@ class DocumentPipeline:
             An EmbeddingResult containing embeddings for each chunk
         """
         usage_tracker = TokenUsageTracker()
-        self.logger.info(f"Running embedder: {self.embedder}")
+        embedding_result = self.embedder.embed_chunks(
+            chunk_result, usage_tracker
+        )
+        return embedding_result
 
+    def _run_step(
+        self,
+        step: _PipelineStep,
+        dpr: DocumentPipelineResult,
+        start_total: float,
+    ) -> tuple[bool, object | None]:
+        key = step.key  # e.g. "ocr"
+        self.logger.info(f"Starting {key} step…")
+        start = time.perf_counter()
         try:
-            embedding_result = self.embedder.embed_chunks(
-                chunk_result, usage_tracker
-            )
-            self.logger.info(
-                "Embedding completed successfully for "
-                f"{len(embedding_result.chunks_with_embeddings)} chunks"
-            )
-
-            return embedding_result
-        except Exception as e:
-            error_traceback = traceback.format_exc()
-            self.logger.error(
-                f"Error in embedder {self.embedder}: {e}\n"
-                f"Traceback: {error_traceback}\n"
-            )
-            raise
-
-    def run_ocr(self, pdf_filepath: str) -> OCRResult:
-        """Perform OCR on a PDF file using the configured OCR processor.
-
-        Args:
-            pdf_filepath: Path to the PDF file to process
-
-        Returns:
-            OCRResult: The OCR result from the processor
-        """
-        return self.ocr_processor.process(pdf_filepath)
+            result = step.run()
+            setattr(dpr.step_report, key, StepStatus.success)
+            setattr(dpr.timings, key, time.perf_counter() - start)
+            step.on_success(result)
+            self.logger.info(f"Step {key} completed")
+            return True, result
+        except Exception as exc:
+            tb = traceback.format_exc()
+            self.logger.error(f"Step {key} failed: {exc}\n{tb}")
+            setattr(dpr.step_report, key, StepStatus.failed)
+            setattr(dpr.timings, key, time.perf_counter() - start)
+            dpr.timings.total_duration = time.perf_counter() - start_total
+            return False, None
 
     def process(
         self,
-        pdf_filepath: str,
+        pdf_filepath: str
     ) -> DocumentPipelineResult:
-        """Process a document through the complete pipeline.
+        """Run the configured pipeline steps in order."""
 
-        This method orchestrates the entire document processing pipeline:
-        1. OCR processing
-        2. Document processors (footnotes, references, etc.)
-        3. Chunking
-        4. Embedding
-
-        Args:
-            pdf_filepath: Path to the PDF file to process
-
-        Returns:
-            A DocumentPipelineResult with all processing results
-
-        Raises:
-            Exception: If any critical step in the pipeline fails
-        """
-        # Record start of whole pipeline
         start_total = time.perf_counter()
-        # Create the pipeline result object we will fill
         dpr = DocumentPipelineResult(
             source_file_path=pdf_filepath,
             processed_at=datetime.now(timezone.utc),
             pipeline_config={
-                "ocr": str(self.ocr_processor) if self.ocr_processor else None,
+                "ocr": str(self.ocr_processor),
                 "processors": [str(p) for p in self.processors],
-                "chunker": str(self.chunker) if self.chunker else None,
-                "embedder": str(self.embedder) if self.embedder else None,
+                "chunker": str(self.chunker),
+                "embedder": str(self.embedder),
             },
             timings=TimingMetrics(),
             total_metrics=[],
             step_report=StepReport(),
         )
 
+        # ---------------- helpers ----------------
+        def _on_success(attr):
+            def handler(res):
+                setattr(dpr, attr, res)
+                # res may be a single result or a list of results
+                if isinstance(res, list):
+                    dpr.total_metrics.extend(
+                        [r.metrics for r in res if r.metrics]
+                    )
+                else:
+                    if isinstance(res.metrics, list):
+                        dpr.total_metrics.extend(res.metrics or [])
+                    else:
+                        dpr.total_metrics.append(res.metrics)
+            return handler
+
+        # placeholders for passing results between steps
+        ocr_res: OCRResult | None = None
+        proc_results: list[ProcessingResult] | None = None
+        chunk_res: ChunkingResult | None = None
+
+        # ---------------- step table ----------------
+        steps = [
+            self._PipelineStep(
+                "ocr",
+                lambda: self.run_ocr(pdf_filepath),
+                _on_success("ocr_result"),
+            ),
+            self._PipelineStep(
+                "processing",
+                lambda: self.run_processors(ocr_res),
+                _on_success("processing_results"),
+            ),
+            self._PipelineStep(
+                "chunking",
+                lambda: self.run_chunker(
+                    proc_results[-1] if proc_results else ocr_res
+                ),
+                _on_success("chunking_result"),
+            ),
+            self._PipelineStep(
+                "embedding",
+                lambda: self.run_embedder(chunk_res),
+                _on_success("embedding_result"),
+            ),
+        ]
+
         try:
-            # Step 1: OCR
-            self.logger.info("Starting OCR processing.")
-            start_ocr = time.perf_counter()
-            try:
-                ocr_result = self.run_ocr(pdf_filepath)
-                self.logger.info("OCR processing completed")
-                dpr.ocr_result = ocr_result
-                dpr.step_report.ocr = StepStatus.success
-                dpr.total_metrics.extend(ocr_result.metrics)
-                dpr.timings.ocr = time.perf_counter() - start_ocr
-            except Exception as e:
-                self.logger.error(f"OCR processing failed: {e}")
-                dpr.step_report.ocr = StepStatus.failed
-                dpr.timings.ocr = time.perf_counter() - start_ocr
-                dpr.timings.total_duration = time.perf_counter() - start_total
-                return dpr
+            for st in steps:
+                ok, res = self._run_step(st, dpr, start_total)
+                if not ok:
+                    return dpr
 
-            # Step 2: Run processors
-            self.logger.info("Starting document processors")
-            try:
-                processing_results = self.run_processors(ocr_result)
-                self.logger.info("Document processors completed")
-                dpr.processing_results = processing_results
-                dpr.step_report.processing = StepStatus.success
-                dpr.total_metrics.extend(
-                    pr.metrics for pr in processing_results
-                )
-                dpr.timings.processing_steps = self._processing_timings
-            except Exception as e:
-                self.logger.error(f"Document processors failed: {e}")
-                dpr.step_report.processing = StepStatus.failed
-                dpr.timings.processing_steps = self._processing_timings
-                dpr.timings.total_duration = time.perf_counter() - start_total
-                return dpr
+                # propagate outputs for later steps
+                if st.key == "ocr":
+                    ocr_res = res  # type: ignore
+                elif st.key == "processing":
+                    proc_results = res  # type: ignore
+                elif st.key == "chunking":
+                    chunk_res = res  # type: ignore
 
-            # Step 3: Chunking
-            self.logger.info("Starting document chunking")
-            start_chunk = time.perf_counter()
-            try:
-                chunk_result = self.run_chunker(processing_results[-1])
-                self.logger.info(
-                    "Chunking completed with "
-                    f"{len(chunk_result.chunks)} chunks"
-                )
-                dpr.chunking_result = chunk_result
-                dpr.step_report.chunking = StepStatus.success
-                dpr.total_metrics.extend(chunk_result.metrics)
-                dpr.timings.chunking = time.perf_counter() - start_chunk
-            except Exception as e:
-                self.logger.error(f"Chunking failed: {e}")
-                dpr.step_report.chunking = StepStatus.failed
-                dpr.timings.chunking = time.perf_counter() - start_chunk
-                dpr.timings.total_duration = time.perf_counter() - start_total
-                return dpr
-
-            # Step 4: Embedding (execute only if chunks are available)
-            self.logger.info("Starting chunk embedding")
-            start_embed = time.perf_counter()
-            try:
-                embedding_result = self.run_embedder(chunk_result)
-                self.logger.info("Embedding completed successfully")
-                dpr.embedding_result = embedding_result
-                dpr.step_report.embedding = StepStatus.success
-                dpr.total_metrics.extend(embedding_result.metrics)
-                dpr.timings.embedding = time.perf_counter() - start_embed
-            except Exception as e:
-                self.logger.error(f"Embedding failed: {e}")
-                dpr.step_report.embedding = StepStatus.failed
-                dpr.timings.embedding = time.perf_counter() - start_embed
-                dpr.timings.total_duration = time.perf_counter() - start_total
-                return dpr
-
-            # Aggregate total cost across all metrics collected
+            # aggregate total cost once
             dpr.total_cost_usd = sum(
-                m.total_cost_usd
+                m.total_cost_usd  # type: ignore[attr-defined]
                 for m in dpr.total_metrics
                 if m and getattr(m, "total_cost_usd", None) is not None
             )
 
-            self.logger.info("Document processing completed for document.")
             dpr.timings.total_duration = time.perf_counter() - start_total
+            self.logger.info("Document processing completed.")
             return dpr
-
         finally:
-            # Capture transcript logs regardless of success or early return
-            try:
-                logs_dump = self._transcript.dump()
-                dpr.logs = logs_dump
-            finally:
-                # Always remove the handler when done
-                logging.getLogger().removeHandler(self._transcript)
+            dpr.logs = self._transcript.dump()
+            logging.getLogger().removeHandler(self._transcript)
