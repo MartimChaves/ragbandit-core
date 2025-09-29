@@ -79,4 +79,4 @@ class BaseEmbedder(ABC):
 
     def __repr__(self) -> str:
         """Return string representation of the embedder."""
-        return f"{self.__class__.__name__}(name={self.name})"
+        return f"{self.__class__.__name__}"
