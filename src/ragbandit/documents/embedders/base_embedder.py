@@ -1,8 +1,13 @@
 from abc import ABC, abstractmethod
 
+# Third-party
 import numpy as np
 
-from ragbandit.schema import ExtendedOCRResponse
+# Project
+from ragbandit.schema import (
+    ChunkingResult,
+    EmbeddingResult,
+)
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
@@ -31,42 +36,20 @@ class BaseEmbedder(ABC):
     @abstractmethod
     def embed_chunks(
         self,
-        chunks: list[dict[str, any]],
-        usage_tracker: TokenUsageTracker | None = None
-    ) -> list[dict[str, any]]:
+        chunk_result: ChunkingResult,
+        usage_tracker: TokenUsageTracker | None = None,
+    ) -> EmbeddingResult:
         """
-        Generate embeddings for a list of document chunks.
+        Generate embeddings for a ChunkingResult.
 
         Args:
-            chunks: List of chunk dictionaries with chunk_text field
+            chunk_result: The ChunkingResult whose chunks will be embedded
             usage_tracker: Optional tracker for token usage
 
         Returns:
-            The chunks with embeddings added
+            An EmbeddingResult containing embedded chunks
         """
         raise NotImplementedError
-
-    def extend_response(
-        self, response: ExtendedOCRResponse, chunks: list[dict[str, any]]
-    ) -> ExtendedOCRResponse:
-        """
-        Extend the response with embedding metadata.
-
-        Args:
-            response: The ExtendedOCRResponse to extend
-            chunks: The chunks with embeddings
-
-        Returns:
-            The extended response
-        """
-        # Store embedding metadata in processing_metadata
-        response.processing_metadata[str(self)] = {
-            "embedder": self.name,
-            "chunk_count": len(chunks),
-            "has_embeddings": all("embedding" in chunk for chunk in chunks)
-        }
-
-        return response
 
     def cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
         """
@@ -96,4 +79,4 @@ class BaseEmbedder(ABC):
 
     def __repr__(self) -> str:
         """Return string representation of the embedder."""
-        return f"{self.__class__.__name__}(name={self.name})"
+        return f"{self.__class__.__name__}"

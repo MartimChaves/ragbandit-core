@@ -1,7 +1,11 @@
-import re
-
+from datetime import datetime, timezone
 from pydantic import BaseModel
-from ragbandit.schema import ExtendedOCRResponse
+from ragbandit.schema import (
+    ProcessingResult,
+    Chunk,
+    ChunkMetadata,
+    ChunkingResult,
+)
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 from ragbandit.prompt_tools.semantic_chunker_tools import (
@@ -40,8 +44,8 @@ class SemanticChunker(BaseChunker):
         self.min_chunk_size = min_chunk_size
 
     def semantic_chunk_pages(
-        self, pages: list[dict], usage_tracker: TokenUsageTracker | None = None
-    ) -> list[dict[str, any]]:
+        self, pages: list, usage_tracker: TokenUsageTracker | None = None
+    ) -> list[Chunk]:
         """
         Chunk pages semantically using LLM-based semantic breaks.
 
@@ -54,7 +58,7 @@ class SemanticChunker(BaseChunker):
         """
         i = 0
         full_text = pages[i].markdown
-        chunks = []
+        chunks: list[Chunk] = []
 
         while i < len(pages):
             # If we have "remainder" from the last iteration,
@@ -68,8 +72,8 @@ class SemanticChunker(BaseChunker):
             if break_lead == "NO_BREAK":
                 # This means the LLM found no break;
                 # treat the entire `full_text` as one chunk
-                chunk_dict = {"chunk_text": full_text, "page_index": i}
-                chunks.append(chunk_dict)
+                meta = ChunkMetadata(page_index=i, images=[], extra={})
+                chunks.append(Chunk(text=full_text, metadata=meta))
                 # Move to the next page
                 i += 1
                 if i < len(pages):
@@ -99,8 +103,8 @@ class SemanticChunker(BaseChunker):
                     # If we still can't find the snippet after
                     # trying shorter versions,
                     # fallback: chunk everything as is
-                    chunk_dict = {"chunk_text": full_text, "page_index": i}
-                    chunks.append(chunk_dict)
+                    meta = ChunkMetadata(page_index=i, images=[], extra={})
+                    chunks.append(Chunk(text=full_text, metadata=meta))
                     i += 1
                     if i < len(pages):
                         full_text = pages[i].markdown
@@ -110,8 +114,8 @@ class SemanticChunker(BaseChunker):
                     # We found a break
                     chunk_text = full_text[:idx]
                     remainder = full_text[idx:]
-                    chunk_dict = {"chunk_text": chunk_text, "page_index": i}
-                    chunks.append(chunk_dict)
+                    meta = ChunkMetadata(page_index=i, images=[], extra={})
+                    chunks.append(Chunk(text=chunk_text, metadata=meta))
 
                     # Now we see if remainder is too small
                     if len(remainder) < 1500:  # ~some threshold
@@ -126,25 +130,26 @@ class SemanticChunker(BaseChunker):
                     if i >= len(pages):
                         # Possibly chunk the remainder if it's not empty
                         if len(full_text.strip()) > 0:
-                            chunk_dict = {
-                                "chunk_text": full_text,
-                                "page_index": min(i, len(pages) - 1),
-                            }
-                            chunks.append(chunk_dict)
+                            meta = ChunkMetadata(
+                                page_index=min(i, len(pages) - 1),
+                                images=[],
+                                extra={},
+                            )
+                            chunks.append(Chunk(text=full_text, metadata=meta))
                         break
 
         return chunks
 
     def chunk(
         self,
-        response: ExtendedOCRResponse,
+        proc_result: ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> list[dict[str, any]]:
+    ) -> ChunkingResult:
         """
         Chunk the document using semantic chunking.
 
         Args:
-            response: The ExtendedOCRResponse containing
+            proc_result: The ProcessingResult containing
                       document content to chunk
             usage_tracker: Tracker for token usage during chunking
 
@@ -154,26 +159,26 @@ class SemanticChunker(BaseChunker):
         self.logger.info("Starting semantic chunking")
 
         # Get the pages from the response
-        pages = response.pages
+        pages = proc_result.pages
 
         # Perform semantic chunking
         chunks = self.semantic_chunk_pages(pages, usage_tracker)
 
-        # Process images in chunks
-        chunks = self._process_images(chunks, response)
+        # Attach image data to chunks using shared helper
+        chunks = self.attach_images(chunks, proc_result)
 
-        # Process the chunks (merge small chunks)
+        # Merge small chunks if needed
         chunks = self.process_chunks(chunks)
 
-        self.logger.info(
-            f"Semantic chunking complete. Created {len(chunks)} chunks."
+        return ChunkingResult(
+            processed_at=datetime.now(timezone.utc),
+            chunks=chunks,
+            metrics=usage_tracker.get_summary() if usage_tracker else None,
         )
 
-        return chunks
-
     def process_chunks(
-        self, chunks: list[dict[str, any]]
-    ) -> list[dict[str, any]]:
+        self, chunks: list[Chunk]
+    ) -> list[Chunk]:
         """
         Process chunks after initial chunking - merge small chunks.
 
@@ -184,7 +189,7 @@ class SemanticChunker(BaseChunker):
             Processed chunks with small chunks merged
         """
         # Check if any chunks are too small
-        min_len = min([len(c["chunk_text"]) for c in chunks]) if chunks else 0
+        min_len = min([len(c.text) for c in chunks]) if chunks else 0
 
         # Merge small chunks if needed
         if min_len < self.min_chunk_size:
@@ -196,47 +201,5 @@ class SemanticChunker(BaseChunker):
                 chunks, min_size=self.min_chunk_size
             )
             self.logger.info(f"After merging: {len(chunks)} chunks")
-
-        return chunks
-
-    def _process_images(
-        self, chunks: list[dict[str, any]], response: ExtendedOCRResponse
-    ) -> list[dict[str, any]]:
-        """
-        Process images in chunks and add them to chunk info.
-
-        Args:
-            chunks: The chunks to process
-            response: The ExtendedOCRResponse containing image data
-
-        Returns:
-            Chunks with image information added
-        """
-        # If chunk has images in them, add it to chunk info
-        img_pattern = re.compile(r"!\[img-\d+\.jpeg\]\(img-\d+\.jpeg\)")
-
-        for chunk in chunks:
-            images_in_chunk = img_pattern.findall(chunk["chunk_text"])
-            has_image = len(images_in_chunk) > 0
-            page_index = chunk["page_index"]
-            chunk["images"] = []
-
-            if has_image:
-                for img in images_in_chunk:
-                    id_of_img = img.split("[")[1].split("]")[0]
-                    base64_of_img = None
-                    rel_images = response.pages[page_index].images
-
-                    for ocr_img in rel_images:
-                        if ocr_img.id == id_of_img:
-                            base64_of_img = ocr_img.image_base64
-                            break
-
-                    if base64_of_img:
-                        img_info = {
-                            "img_id": id_of_img,
-                            "image_base64": base64_of_img,
-                        }
-                        chunk["images"].append(img_info)
 
         return chunks

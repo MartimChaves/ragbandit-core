@@ -12,6 +12,7 @@ from ragbandit.config.pricing import (
     EMBEDDING_COSTS,
     DEFAULT_MODEL
 )
+from ragbandit.schema import TokenUsageMetrics
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -81,6 +82,11 @@ def calculate_cost(
 
 class TokenUsageTracker:
     """Track token usage and costs across multiple API calls."""
+    total_input_tokens: int
+    total_output_tokens: int
+    total_embedding_tokens: int
+    total_cost: float
+    calls_by_model: dict[str, dict[str, int | float]]
 
     def __init__(self):
         self.total_input_tokens = 0
@@ -90,8 +96,11 @@ class TokenUsageTracker:
         self.calls_by_model = {}
 
     def add_usage(
-        self, input_tokens: int, output_tokens: int, model: str = DEFAULT_MODEL
-    ):
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        model: str = DEFAULT_MODEL,
+    ) -> None:
         """
         Add usage statistics from an API call.
 
@@ -121,7 +130,7 @@ class TokenUsageTracker:
         self.calls_by_model[model]["output_tokens"] += output_tokens
         self.calls_by_model[model]["cost"] += cost
 
-    def add_embedding_tokens(self, tokens: int, model: str):
+    def add_embedding_tokens(self, tokens: int, model: str) -> None:
         """
         Add embedding token usage statistics.
 
@@ -156,48 +165,56 @@ class TokenUsageTracker:
         )
         self.calls_by_model[model]["cost"] += cost
 
-    def get_summary(self) -> dict:
+    def get_summary(self) -> TokenUsageMetrics:
         """
         Get a summary of token usage and costs.
 
         Returns:
-            Dictionary with usage summary
+            TokenUsageMetrics object with usage summary
         """
-        return {
-            "total_calls": sum(
-                m["calls"] for m in self.calls_by_model.values()
-            ),
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-            "total_embedding_tokens": self.total_embedding_tokens,
-            "total_tokens": (
+        models_converted: dict[str, TokenUsageMetrics.ModelUsage] = {}
+        for model_name, stats in self.calls_by_model.items():
+            models_converted[model_name] = TokenUsageMetrics.ModelUsage(
+                calls=int(stats.get("calls", 0)),
+                input_tokens=int(stats.get("input_tokens", 0)),
+                output_tokens=int(stats.get("output_tokens", 0)),
+                embedding_tokens=int(stats.get("embedding_tokens", 0)),
+                cost=float(stats.get("cost", 0.0)),
+            )
+
+        return TokenUsageMetrics(
+            total_calls=sum(m.calls for m in models_converted.values()),
+            total_input_tokens=self.total_input_tokens,
+            total_output_tokens=self.total_output_tokens,
+            total_embedding_tokens=self.total_embedding_tokens,
+            total_tokens=(
                 self.total_input_tokens +
                 self.total_output_tokens +
                 self.total_embedding_tokens
             ),
-            "total_cost_usd": self.total_cost,
-            "models": self.calls_by_model,
-        }
+            total_cost_usd=self.total_cost,
+            models=models_converted,
+        )
 
-    def log_summary(self, level=logging.INFO):
+    def log_summary(self, level: int = logging.INFO) -> None:
         """Log a summary of token usage and costs."""
         summary = self.get_summary()
 
         # Build log message
-        message = f"API Usage: {summary['total_calls']} calls, "
+        message = f"API Usage: {summary.total_calls} calls, "
 
         # Add LLM token counts if any
-        if summary['total_input_tokens'] > 0 or summary['total_output_tokens'] > 0:  # noqa
+        if summary.total_input_tokens > 0 or summary.total_output_tokens > 0:  # noqa
             message += (
-                f"LLM: {summary['total_input_tokens']:,} input + "
-                f"{summary['total_output_tokens']:,} output tokens, "
+                f"LLM: {summary.total_input_tokens:,} input + "
+                f"{summary.total_output_tokens:,} output tokens, "
             )
 
         # Add embedding token counts if any
-        if summary['total_embedding_tokens'] > 0:
-            message += f"Embeddings: {summary['total_embedding_tokens']:,} tokens, "  # noqa
+        if summary.total_embedding_tokens > 0:
+            message += f"Embeddings: {summary.total_embedding_tokens:,} tokens, "  # noqa
 
         # Add total cost
-        message += f"Total: ${summary['total_cost_usd']:.4f} USD"
+        message += f"Total: ${summary.total_cost_usd:.4f} USD"
 
         logger.log(level, message)

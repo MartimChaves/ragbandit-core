@@ -1,4 +1,11 @@
-from ragbandit.schema import ExtendedOCRResponse
+from datetime import datetime, timezone
+
+from ragbandit.schema import (
+    ProcessingResult,
+    Chunk,
+    ChunkMetadata,
+    ChunkingResult,
+)
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 from ragbandit.documents.chunkers.base_chunker import BaseChunker
 
@@ -29,30 +36,53 @@ class FixedSizeChunker(BaseChunker):
 
     def chunk(
         self,
-        response: ExtendedOCRResponse,
+        proc_result: ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> list[dict[str, any]]:
+    ) -> ChunkingResult:
         """
         Chunk the document into fixed-size chunks.
 
         Args:
-            response: The ExtendedOCRResponse containing
+            proc_result: The ProcessingResult containing
                       document content to chunk
             usage_tracker: Optional tracker for token usage
                            (not used in this chunker)
 
         Returns:
-            A list of chunk dictionaries
+            A ChunkingResult containing Chunk objects
         """
+        # 1. Generate raw chunks for each page
+        chunks = self._fixed_size_chunk_pages(proc_result)
+
+        # 2. Attach any inline images using BaseChunker helper
+        chunks = self.attach_images(chunks, proc_result)
+
+        # 3. Merge small chunks if needed
+        chunks = self.process_chunks(chunks)
+
+        # 4. Wrap in ChunkingResult
+        return ChunkingResult(
+            processed_at=datetime.now(timezone.utc),
+            chunks=chunks,
+            metrics=None,
+        )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    def _fixed_size_chunk_pages(
+        self, proc_result: ProcessingResult
+    ) -> list[Chunk]:
+        """Split each page into fixed-size chunks with optional overlap."""
+
         self.logger.info(
             f"Starting fixed-size chunking with size={self.chunk_size}, "
             f"overlap={self.overlap}"
         )
 
-        chunks = []
+        chunks: list[Chunk] = []
 
         # Process each page
-        for page_index, page in enumerate(response.pages):
+        for page_index, page in enumerate(proc_result.pages):
             page_text = page.markdown
 
             # Skip empty pages
@@ -88,12 +118,10 @@ class FixedSizeChunker(BaseChunker):
 
                 # Create the chunk
                 chunk_text = page_text[start:end]
-                chunk = {
-                    "chunk_text": chunk_text,
-                    "page_index": page_index,
-                    "images": [],  # Initialize empty images list
-                }
-                chunks.append(chunk)
+                meta = ChunkMetadata(
+                    page_index=page_index, images=[], extra={}
+                    )
+                chunks.append(Chunk(text=chunk_text, metadata=meta))
 
                 # Check if we've reached the end of the page text
                 if end >= len(page_text):
@@ -110,11 +138,12 @@ class FixedSizeChunker(BaseChunker):
         self.logger.info(
             f"Fixed-size chunking complete. Created {len(chunks)} chunks."
         )
+
         return chunks
 
     def process_chunks(
-        self, chunks: list[dict[str, any]]
-    ) -> list[dict[str, any]]:
+        self, chunks: list[Chunk]
+    ) -> list[Chunk]:
         """
         Process chunks after initial chunking - merge small chunks if needed.
 
@@ -131,7 +160,7 @@ class FixedSizeChunker(BaseChunker):
         min_chunk_size = self.chunk_size // 2
 
         # Check if any chunks are too small
-        min_len = min([len(c["chunk_text"]) for c in chunks])
+        min_len = min(len(c.text) for c in chunks)
 
         # Merge small chunks if needed
         if min_len < min_chunk_size:

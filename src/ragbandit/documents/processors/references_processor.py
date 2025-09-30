@@ -14,7 +14,7 @@ from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 from ragbandit.prompt_tools.references_processor_tools import (
     detect_references_header_tool,
 )
-from ragbandit.schema import ExtendedOCRResponse
+from ragbandit.schema import OCRResult, ProcessingResult
 
 
 class ReferencesProcessor(BaseProcessor):
@@ -38,26 +38,40 @@ class ReferencesProcessor(BaseProcessor):
 
     def process(
         self,
-        ocr_pages: ExtendedOCRResponse,
+        document: OCRResult | ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ExtendedOCRResponse, str]:
+    ) -> ProcessingResult:
         """Process OCR pages to detect and remove references.
 
         Args:
-            ocr_pages: OCR response to process
+            document: OCRResult or ProcessingResult to process
             usage_tracker: Token usage tracker for LLM calls
 
         Returns:
             Tuple containing:
-            - Modified OCR pages with references removed
+            - Modified ProcessingResult with references removed
             - Extracted references as markdown
         """
 
-        modified_pages, references_markdown = self.remove_refs(
-            ocr_pages, usage_tracker
+        # Normalize input once
+        proc_input = self.ensure_processing_result(
+                        document, processor_name=str(self)
+                    )
+
+        proc_result, references_markdown = self.remove_refs(
+            proc_input, usage_tracker
         )
 
-        return modified_pages, references_markdown
+        # Save extracted references into processing result metadata
+        if references_markdown:
+            if proc_result.extracted_data is None:
+                proc_result.extracted_data = {}
+
+            proc_result.extracted_data["references_markdown"] = (
+                references_markdown
+            )
+
+        return proc_result
 
     def find_best_match(
         self, target: str, string_list: list[str]
@@ -87,53 +101,53 @@ class ReferencesProcessor(BaseProcessor):
 
     def remove_refs(
         self,
-        ocr_pages_raw: ExtendedOCRResponse,
+        proc_result: ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ExtendedOCRResponse, str]:
+    ) -> tuple[ProcessingResult, str]:
         """Remove references section from document and extract as markdown.
 
         This method identifies the references section in a document,
         extracts it, and removes it from the original document.
 
         Args:
-            ocr_pages_raw: The OCR response containing document pages
+            proc_result: The document to process (ProcessingResult)
             usage_tracker: Optional tracker for token usage in LLM calls
 
         Returns:
             Tuple containing:
-            - Modified OCR pages with references removed
+            - Modified ProcessingResult with references removed
             - Extracted references as markdown
         """
         # Extract headers and identify references section
-        headers = self._extract_headers(ocr_pages_raw)
+        headers = self._extract_headers(proc_result)
         refs_header, refs_header_index = self._identify_references_header(
             headers, usage_tracker
         )
 
         # If no references header found, return original document unchanged
         if not refs_header:
-            return ocr_pages_raw, ""
+            return proc_result, ""
 
         # Find next header (if any) after references
         next_header = self._find_next_header(headers, refs_header_index)
 
         # Find page boundaries of references section
         boundaries = self._find_reference_boundaries(
-            ocr_pages_raw, refs_header, next_header
+            proc_result, refs_header, next_header
         )
 
         # If boundaries couldn't be determined, return original document
         if not boundaries:
-            return ocr_pages_raw, ""
+            return proc_result, ""
 
         # Extract references and modify document
-        return self._extract_references(ocr_pages_raw, boundaries)
+        return self._extract_references(proc_result, boundaries)
 
-    def _extract_headers(self, ocr_pages: ExtendedOCRResponse) -> list[str]:
+    def _extract_headers(self, proc_result: ProcessingResult) -> list[str]:
         """Extract all headers from document.
 
         Args:
-            ocr_pages: OCR response containing document pages
+            proc_result: ProcessingResult containing document pages
 
         Returns:
             List of headers found in the document
@@ -146,7 +160,7 @@ class ReferencesProcessor(BaseProcessor):
 
         # Search for headers in complete markdown string
         full_markdown = ""
-        for page in ocr_pages.pages:
+        for page in proc_result.pages:
             full_markdown += page.markdown
 
         return header_regex.findall(full_markdown)
@@ -196,14 +210,14 @@ class ReferencesProcessor(BaseProcessor):
 
     def _find_reference_boundaries(
         self,
-        ocr_pages: ExtendedOCRResponse,
+        proc_result: ProcessingResult,
         refs_header: str,
         next_header: str | None,
     ) -> dict | None:
         """Find the boundaries of the references section.
 
         Args:
-            ocr_pages: OCR response containing document pages
+            proc_result: ProcessingResult containing document pages
             refs_header: The identified references header
             next_header: The next header after references (if any)
 
@@ -214,7 +228,7 @@ class ReferencesProcessor(BaseProcessor):
         next_header_page = -1
 
         # Find the pages where references start and end
-        for page in ocr_pages.pages:
+        for page in proc_result.pages:
             if refs_header in page.markdown:
                 refs_page = page.index
             if next_header is not None and next_header in page.markdown:
@@ -225,14 +239,14 @@ class ReferencesProcessor(BaseProcessor):
             return None
 
         # Get the location (page, index) where references start
-        refs_page_markdown = ocr_pages.pages[refs_page].markdown
+        refs_page_markdown = proc_result.pages[refs_page].markdown
         references_start_index = refs_page_markdown.find(refs_header)
         references_start = (refs_page, references_start_index)
 
         # Determine where references end
         references_end = None
         if next_header is not None and next_header_page != -1:
-            next_header_page_markdown = ocr_pages.pages[
+            next_header_page_markdown = proc_result.pages[
                 next_header_page
             ].markdown
             references_end_index = next_header_page_markdown.find(next_header)
@@ -247,12 +261,12 @@ class ReferencesProcessor(BaseProcessor):
         }
 
     def _extract_references(
-        self, ocr_pages: ExtendedOCRResponse, boundaries: dict
-    ) -> tuple[ExtendedOCRResponse, str]:
+        self, proc_result: ProcessingResult, boundaries: dict
+    ) -> tuple[ProcessingResult, str]:
         """Extract references from document based on boundaries.
 
         Args:
-            ocr_pages: OCR response containing document pages
+            proc_result: ProcessingResult containing document pages
             boundaries: Dictionary with reference section boundaries
 
         Returns:
@@ -263,26 +277,28 @@ class ReferencesProcessor(BaseProcessor):
 
         # If references end at the end of document
         if references_end is None:
-            return self._extract_references_at_end(ocr_pages, references_start)
+            return self._extract_references_at_end(
+                proc_result, references_start
+            )
 
         # If references are contained within a single page
         if references_end[0] == references_start[0]:
             return self._extract_references_same_page(
-                ocr_pages, references_start, references_end
+                proc_result, references_start, references_end
             )
 
         # If references span multiple pages
         return self._extract_references_multi_page(
-            ocr_pages, references_start, references_end
+            proc_result, references_start, references_end
         )
 
     def _extract_references_at_end(
-        self, ocr_pages: ExtendedOCRResponse, references_start: tuple[int, int]
-    ) -> tuple[ExtendedOCRResponse, str]:
+        self, proc_result: ProcessingResult, references_start: tuple[int, int]
+    ) -> tuple[ProcessingResult, str]:
         """Extract references when they are the last section in the document.
 
         Args:
-            ocr_pages: OCR response containing document pages
+            proc_result: ProcessingResult containing document pages
             references_start: Tuple (page_index, char_index) where
                               references start
 
@@ -292,14 +308,14 @@ class ReferencesProcessor(BaseProcessor):
         references_markdown = ""
         start_page = True
 
-        for page_index in range(references_start[0], len(ocr_pages.pages)):
+        for page_index in range(references_start[0], len(proc_result.pages)):
             if start_page:
                 # Extract references text from first page,
                 # preserve text before references
-                references_markdown += ocr_pages.pages[page_index].markdown[
+                references_markdown += proc_result.pages[page_index].markdown[
                     references_start[1]:
                 ]
-                ocr_pages.pages[page_index].markdown = ocr_pages.pages[
+                proc_result.pages[page_index].markdown = proc_result.pages[
                     page_index
                 ].markdown[0:references_start[1]]
                 start_page = False
@@ -307,21 +323,21 @@ class ReferencesProcessor(BaseProcessor):
 
             # For subsequent pages, extract all content
             # (assumed to be references)
-            references_markdown += ocr_pages.pages[page_index].markdown
-            ocr_pages.pages[page_index].markdown = ""
+            references_markdown += proc_result.pages[page_index].markdown
+            proc_result.pages[page_index].markdown = ""
 
-        return ocr_pages, references_markdown
+        return proc_result, references_markdown
 
     def _extract_references_same_page(
         self,
-        ocr_pages: ExtendedOCRResponse,
+        proc_result: ProcessingResult,
         references_start: tuple[int, int],
         references_end: tuple[int, int],
-    ) -> tuple[ExtendedOCRResponse, str]:
+    ) -> tuple[ProcessingResult, str]:
         """Extract references when they start and end on the same page.
 
         Args:
-            ocr_pages: OCR response containing document pages
+            proc_result: ProcessingResult containing document pages
             references_start: Tuple (page_index, char_index) where
                               references start
             references_end: Tuple (page_index, char_index) where references end
@@ -332,28 +348,28 @@ class ReferencesProcessor(BaseProcessor):
         page_idx = references_start[0]
 
         # Extract the references section
-        references_markdown = ocr_pages.pages[page_idx].markdown[
+        references_markdown = proc_result.pages[page_idx].markdown[
             references_start[1]:references_end[1]
         ]
 
         # Remove references section from the page
-        ocr_pages.pages[page_idx].markdown = (
-            ocr_pages.pages[page_idx].markdown[0:references_start[1]]
-            + ocr_pages.pages[page_idx].markdown[references_end[1]:]
+        proc_result.pages[page_idx].markdown = (
+            proc_result.pages[page_idx].markdown[0:references_start[1]]
+            + proc_result.pages[page_idx].markdown[references_end[1]:]
         )
 
-        return ocr_pages, references_markdown
+        return proc_result, references_markdown
 
     def _extract_references_multi_page(
         self,
-        ocr_pages: ExtendedOCRResponse,
+        proc_result: ProcessingResult,
         references_start: tuple[int, int],
         references_end: tuple[int, int],
-    ) -> tuple[ExtendedOCRResponse, str]:
+    ) -> tuple[ProcessingResult, str]:
         """Extract references when they span multiple pages.
 
         Args:
-            ocr_pages: OCR response containing document pages
+            proc_result: ProcessingResult containing document pages
             references_start: Tuple (page_index, char_index) where
                               references start
             references_end: Tuple (page_index, char_index) where references end
@@ -367,44 +383,26 @@ class ReferencesProcessor(BaseProcessor):
         for page_index in range(references_start[0], references_end[0] + 1):
             # First page with references
             if page_index == references_start[0]:
-                references_markdown += ocr_pages.pages[page_index].markdown[
+                references_markdown += proc_result.pages[page_index].markdown[
                     references_start[1]:
                 ]
-                ocr_pages.pages[page_index].markdown = ocr_pages.pages[
+                proc_result.pages[page_index].markdown = proc_result.pages[
                     page_index
                 ].markdown[0:references_start[1]]
                 continue
 
             # Last page with references
             if page_index == references_end[0]:
-                references_markdown += ocr_pages.pages[page_index].markdown[
+                references_markdown += proc_result.pages[page_index].markdown[
                     0:references_end[1]
                 ]
-                ocr_pages.pages[page_index].markdown = ocr_pages.pages[
+                proc_result.pages[page_index].markdown = proc_result.pages[
                     page_index
                 ].markdown[references_end[1]:]
                 continue
 
             # Middle pages (contain only references)
-            references_markdown += ocr_pages.pages[page_index].markdown
-            ocr_pages.pages[page_index].markdown = ""
+            references_markdown += proc_result.pages[page_index].markdown
+            proc_result.pages[page_index].markdown = ""
 
-        return ocr_pages, references_markdown
-
-    def extend_response(
-        self, response: ExtendedOCRResponse, metadata: object
-    ) -> None:
-        """Extend the response with references metadata.
-
-        Args:
-            response: Extended OCR response to update
-            metadata: References markdown extracted during processing
-        """
-        if metadata:
-            # Initialize processing_metadata if it doesn't exist
-            if response.processing_metadata is None:
-                response.processing_metadata = {}
-            # Store metadata under the processor's __repr__ key
-            response.processing_metadata[self.__repr__()] = metadata
-
-        return response
+        return proc_result, references_markdown

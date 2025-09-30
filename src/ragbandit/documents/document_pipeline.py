@@ -8,8 +8,19 @@ of document processors in sequence, chunking, and embedding.
 import logging
 import traceback
 from datetime import datetime, timezone
-
-from mistralai import OCRResponse
+from typing import Callable
+import time
+from dataclasses import dataclass
+from ragbandit.schema import (
+    OCRResult,
+    ProcessingResult,
+    ChunkingResult,
+    EmbeddingResult,
+    DocumentPipelineResult,
+    TimingMetrics,
+    StepReport,
+    StepStatus,
+)
 
 from ragbandit.documents.ocr import BaseOCR
 from ragbandit.documents.processors.base_processor import BaseProcessor
@@ -17,7 +28,6 @@ from ragbandit.documents.chunkers.base_chunker import BaseChunker
 from ragbandit.documents.embedders.base_embedder import BaseEmbedder
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
-from ragbandit.schema import ExtendedOCRResponse
 from ragbandit.utils.in_memory_log_handler import InMemoryLogHandler
 
 
@@ -29,6 +39,12 @@ class DocumentPipeline:
     where each processor receives the output of the previous processor.
     The pipeline also tracks token usage and costs for each document.
     """
+
+    @dataclass
+    class _PipelineStep:
+        key: str  # "ocr" | "processing" | "chunking" | "embedding"
+        run: Callable[[], object]
+        on_success: Callable[[object], None]
 
     def __init__(
         self,
@@ -78,313 +94,215 @@ class DocumentPipeline:
         if self._transcript not in root_logger.handlers:
             root_logger.addHandler(self._transcript)
 
-    def run_processors(
-        self,
-        ocr_response: OCRResponse,
-        document_id: str,
-        metadata: dict[str, any] | None = None,
-        usage_tracker: TokenUsageTracker | None = None,
-    ) -> ExtendedOCRResponse:
-        """Process a document through the processors pipeline.
-
-        Args:
-            ocr_response: The initial OCR response to process
-            document_id: Unique identifier for the document
-            metadata: Optional metadata to include in the extended response
-            usage_tracker: Optional token usage tracker
-
-        Returns:
-            An extended OCR response with additional metadata
-            from all processors
-        """
-        extended_response = None
-
-        try:
-            # Use provided usage tracker or create a new one
-            usage_tracker = usage_tracker or TokenUsageTracker()
-
-            # Initialize the extended response with the OCR response
-            extended_response = ExtendedOCRResponse(
-                                    **ocr_response.model_dump()
-                                )
-
-            # Add processing metadata
-            processing_metadata = metadata or {}
-            processing_metadata.update(
-                {
-                    "document_id": document_id,
-                    "processing_started": datetime.now(timezone.utc),
-                    "processors": [str(p) for p in self.processors],
-                }
-            )
-
-            # Add metadata to the extended response
-            extended_response.processing_metadata = processing_metadata
-
-            # Process the document through each processor in sequence
-            for processor in self.processors:
-                self.logger.info(f"Running processor: {processor}")
-                try:
-                    # Process the document
-                    extended_response, processor_metadata = processor.process(
-                        extended_response, usage_tracker
-                    )
-
-                    # Extend the response with processor-specific metadata
-                    extended_response = processor.extend_response(
-                        extended_response, processor_metadata
-                    )
-
-                    self.logger.info(
-                        f"Processor {processor} completed successfully"
-                    )
-                except Exception as e:
-                    error_traceback = traceback.format_exc()
-                    self.logger.error(
-                        f"Error in processor {processor}: {e}\n"
-                        f"Traceback: {error_traceback}\n"
-                    )
-                    # Continue with the next processor
-                    continue
-
-            # Add token usage information to the extended response
-            usage_summary = usage_tracker.get_summary()
-            extended_response.processing_metadata["token_usage"] = \
-                usage_summary
-
-            # Update processing metadata
-            now = datetime.now(timezone.utc)
-            extended_response.processing_metadata["processing_completed"] = now
-
-            return extended_response
-        finally:
-            # We don't save logs or remove handlers here since
-            # that's handled by the process method
-            if extended_response is None:
-                extended_response = ExtendedOCRResponse(
-                                        **ocr_response.model_dump()
-                                    )
-
-    def run_chunker(
-        self,
-        extended_response: ExtendedOCRResponse,
-        usage_tracker: TokenUsageTracker | None = None,
-    ) -> list[dict[str, any]]:
-        """Chunk the document using the configured chunker.
-
-        Args:
-            extended_response: The extended OCR response to chunk
-            usage_tracker: Optional token usage tracker
-
-        Returns:
-            A list of chunk dictionaries
-        """
-        usage_tracker = usage_tracker or TokenUsageTracker()
-        self.logger.info(f"Running chunker: {self.chunker}")
-
-        try:
-            # Generate initial chunks
-            chunks = self.chunker.chunk(extended_response, usage_tracker)
-            self.logger.info(
-                f"Initial chunking completed, created {len(chunks)} chunks"
-            )
-
-            # Process chunks (e.g., merge small chunks)
-            chunks = self.chunker.process_chunks(chunks)
-            self.logger.info(
-                f"Chunk processing completed, final chunk count: {len(chunks)}"
-            )
-
-            return chunks
-        except Exception as e:
-            error_traceback = traceback.format_exc()
-            self.logger.error(
-                f"Error in chunker {self.chunker}: {e}\n"
-                f"Traceback: {error_traceback}\n"
-            )
-            raise
-
-    def run_embedder(
-        self,
-        chunks: list[dict[str, any]],
-        extended_response: ExtendedOCRResponse,
-        usage_tracker: TokenUsageTracker | None = None,
-    ) -> ExtendedOCRResponse:
-        """Embed chunks using the configured embedder.
-
-        Args:
-            chunks: The chunks to embed
-            extended_response: The extended OCR response
-                               to update with embeddings
-            usage_tracker: Optional token usage tracker
-
-        Returns:
-            The updated extended OCR response with embeddings
-        """
-        usage_tracker = usage_tracker or TokenUsageTracker()
-        self.logger.info(f"Running embedder: {self.embedder}")
-
-        try:
-            chunks_with_embeddings = self.embedder.embed_chunks(
-                                        chunks, usage_tracker
-                                    )
-            self.logger.info(
-                "Embedding completed successfully for "
-                f"{len(chunks_with_embeddings)} chunks"
-            )
-
-            # Extend the response with embedding metadata
-            extended_response = self.embedder.extend_response(
-                extended_response, chunks_with_embeddings
-            )
-            return extended_response
-        except Exception as e:
-            error_traceback = traceback.format_exc()
-            self.logger.error(
-                f"Error in embedder {self.embedder}: {e}\n"
-                f"Traceback: {error_traceback}\n"
-            )
-            raise
-
-    def perform_ocr(self, pdf_filepath: str) -> OCRResponse:
+    def run_ocr(self, pdf_filepath: str) -> OCRResult:
         """Perform OCR on a PDF file using the configured OCR processor.
 
         Args:
             pdf_filepath: Path to the PDF file to process
 
         Returns:
-            OCRResponse: The OCR response from the processor
+            OCRResult: The OCR result from the processor
         """
         return self.ocr_processor.process(pdf_filepath)
 
-    def process(
+    def run_processors(
         self,
-        pdf_filepath: str,
-        document_id: str,
-        metadata: dict[str, any] | None = None,
-        run_chunking: bool = True,
-        run_embedding: bool = True,
-    ) -> ExtendedOCRResponse:
-        """Process a document through the complete pipeline.
-
-        This method orchestrates the entire document processing pipeline:
-        1. OCR processing
-        2. Document processors (footnotes, references, etc.)
-        3. Chunking (optional)
-        4. Embedding (optional)
+        ocr_result: OCRResult,
+    ) -> list[ProcessingResult]:
+        """Process a document through the processors pipeline.
 
         Args:
-            pdf_filepath: Path to the PDF file to process
-            document_id: Unique identifier for the document
-            metadata: Optional metadata to include in the extended response
-            run_chunking: Whether to run the chunking step
-            run_embedding: Whether to run the embedding step
+            ocr_result: The initial OCR result to process
 
         Returns:
-            An extended OCR response with all processing results
-
-        Raises:
-            Exception: If any critical step in the pipeline fails
+            A list of ProcessingResult with additional metadata
+            from all processors
         """
-        # Create a usage tracker for the entire pipeline
+        processing_results: list[ProcessingResult] = []
+
+        # Start the processor chain with the raw OCRResult; each processor
+        # is responsible for converting it to ProcessingResult if needed.
+        prev_result = ocr_result
+
+        # Process the document through each processor in sequence
+        for processor in self.processors:
+            self.logger.info(f"Running processor: {processor}")
+
+            # Give each processor its own usage tracker
+            proc_usage = TokenUsageTracker()
+
+            start_processing = time.perf_counter()
+            proc_result = processor.process(prev_result, proc_usage)
+            end_processing = time.perf_counter()
+
+            # Attach token usage summary to metrics
+            proc_result.metrics = proc_usage.get_summary()
+            proc_duration = end_processing - start_processing
+            proc_result.processing_duration = proc_duration
+
+            processing_results.append(proc_result)
+            prev_result = proc_result
+            self.logger.info(f"{processor} completed successfully")
+
+        return processing_results
+
+    def run_chunker(
+        self,
+        doc: ProcessingResult | OCRResult,
+    ) -> ChunkingResult:
+        """Chunk the document using the configured chunker.
+
+        Args:
+            proc_result: The ProcessingResult to chunk
+
+        Returns:
+            A ChunkingResult object
+        """
+        proc_result = (
+            doc
+            if isinstance(doc, ProcessingResult)
+            else BaseProcessor.ensure_processing_result(doc)
+        )
         usage_tracker = TokenUsageTracker()
-        extended_response = None
+        # Generate chunks via chunker -> returns ChunkingResult
+        chunk_result = self.chunker.chunk(proc_result, usage_tracker)
+        return chunk_result
+
+    def run_embedder(
+        self,
+        chunk_result: ChunkingResult,
+    ) -> EmbeddingResult:
+        """Embed chunks using the configured embedder.
+
+        Args:
+            chunk_result: The ChunkingResult to embed
+            usage_tracker: Optional token usage tracker
+
+        Returns:
+            An EmbeddingResult containing embeddings for each chunk
+        """
+        usage_tracker = TokenUsageTracker()
+        embedding_result = self.embedder.embed_chunks(
+            chunk_result, usage_tracker
+        )
+        return embedding_result
+
+    def _run_step(
+        self,
+        step: _PipelineStep,
+        dpr: DocumentPipelineResult,
+        start_total: float,
+    ) -> tuple[bool, object | None]:
+        key = step.key  # e.g. "ocr"
+        self.logger.info(f"Starting {key} step…")
+        start = time.perf_counter()
+        try:
+            result = step.run()
+            setattr(dpr.step_report, key, StepStatus.success)
+            setattr(dpr.timings, key, time.perf_counter() - start)
+            step.on_success(result)
+            self.logger.info(f"Step {key} completed")
+            return True, result
+        except Exception as exc:
+            tb = traceback.format_exc()
+            self.logger.error(f"Step {key} failed: {exc}\n{tb}")
+            setattr(dpr.step_report, key, StepStatus.failed)
+            setattr(dpr.timings, key, time.perf_counter() - start)
+            dpr.timings.total_duration = time.perf_counter() - start_total
+            return False, None
+
+    def process(
+        self,
+        pdf_filepath: str
+    ) -> DocumentPipelineResult:
+        """Run the configured pipeline steps in order."""
+
+        start_total = time.perf_counter()
+        dpr = DocumentPipelineResult(
+            source_file_path=pdf_filepath,
+            processed_at=datetime.now(timezone.utc),
+            pipeline_config={
+                "ocr": str(self.ocr_processor),
+                "processors": [str(p) for p in self.processors],
+                "chunker": str(self.chunker),
+                "embedder": str(self.embedder),
+            },
+            timings=TimingMetrics(),
+            total_metrics=[],
+            step_report=StepReport(),
+        )
+
+        # ---------------- helpers ----------------
+        def _on_success(attr):
+            def handler(res):
+                setattr(dpr, attr, res)
+                # res may be a single result or a list of results
+                if isinstance(res, list):
+                    dpr.total_metrics.extend(
+                        [r.metrics for r in res if r.metrics]
+                    )
+                else:
+                    if isinstance(res.metrics, list):
+                        dpr.total_metrics.extend(res.metrics or [])
+                    else:
+                        dpr.total_metrics.append(res.metrics)
+            return handler
+
+        # placeholders for passing results between steps
+        ocr_res: OCRResult | None = None
+        proc_results: list[ProcessingResult] | None = None
+        chunk_res: ChunkingResult | None = None
+
+        # ---------------- step table ----------------
+        steps = [
+            self._PipelineStep(
+                "ocr",
+                lambda: self.run_ocr(pdf_filepath),
+                _on_success("ocr_result"),
+            ),
+            self._PipelineStep(
+                "processing",
+                lambda: self.run_processors(ocr_res),
+                _on_success("processing_results"),
+            ),
+            self._PipelineStep(
+                "chunking",
+                lambda: self.run_chunker(
+                    proc_results[-1] if proc_results else ocr_res
+                ),
+                _on_success("chunking_result"),
+            ),
+            self._PipelineStep(
+                "embedding",
+                lambda: self.run_embedder(chunk_res),
+                _on_success("embedding_result"),
+            ),
+        ]
 
         try:
-            # Step 1: OCR
-            self.logger.info(
-                f"Starting OCR processing for document: {document_id}"
-            )
-            try:
-                ocr_response = self.perform_ocr(pdf_filepath)
-                self.logger.info("OCR processing completed")
-            except Exception as e:
-                self.logger.error(f"OCR processing failed: {e}")
-                # OCR is a critical step - if it fails, we can't continue
-                raise
+            for st in steps:
+                ok, res = self._run_step(st, dpr, start_total)
+                if not ok:
+                    return dpr
 
-            # Step 2: Run processors
-            self.logger.info("Starting document processors")
-            try:
-                extended_response = self.run_processors(
-                    ocr_response, document_id, metadata, usage_tracker
-                )
-                self.logger.info("Document processors completed")
-            except Exception as e:
-                self.logger.error(f"Document processors failed: {e}")
-                # If processors fail, we still have the OCR response to return
-                extended_response = ExtendedOCRResponse(
-                                        **ocr_response.model_dump()
-                                    )
-                if metadata:
-                    extended_response.processing_metadata = metadata
-                return extended_response
+                # propagate outputs for later steps
+                if st.key == "ocr":
+                    ocr_res = res  # type: ignore
+                elif st.key == "processing":
+                    proc_results = res  # type: ignore
+                elif st.key == "chunking":
+                    chunk_res = res  # type: ignore
 
-            # Step 3: Chunking (if enabled)
-            chunks = None
-            if run_chunking:
-                self.logger.info("Starting document chunking")
-                try:
-                    chunks = self.run_chunker(extended_response, usage_tracker)
-                    # Store chunks in metadata
-                    if extended_response.processing_metadata is None:
-                        extended_response.processing_metadata = {}
-                    extended_response.processing_metadata["chunks"] = {
-                        "count": len(chunks),
-                        "chunker": str(self.chunker),
-                    }
-                    self.logger.info(
-                        f"Chunking completed with {len(chunks)} chunks"
-                    )
-                except Exception as e:
-                    self.logger.error(f"Chunking failed: {e}")
-                    # If chunking fails, we can't proceed with embedding
-                    # but we can return the processed document
-                    if extended_response.processing_metadata is None:
-                        extended_response.processing_metadata = {}
-                    extended_response.processing_metadata["chunking_error"] = \
-                        str(e)
-                    run_embedding = False
-
-            # Step 4: Embedding (if enabled and chunks are available)
-            if run_embedding and chunks:
-                self.logger.info("Starting chunk embedding")
-                try:
-                    extended_response = self.run_embedder(
-                        chunks, extended_response, usage_tracker
-                    )
-                    self.logger.info("Embedding completed successfully")
-                except Exception as e:
-                    self.logger.error(f"Embedding failed: {e}")
-                    # If embedding fails,
-                    # we still have the processed document and chunks
-                    if extended_response.processing_metadata is None:
-                        extended_response.processing_metadata = {}
-                    extended_response\
-                        .processing_metadata["embedding_error"] = str(e)
-
-            # Update final token usage
-            if extended_response.processing_metadata is None:
-                extended_response.processing_metadata = {}
-            extended_response.processing_metadata["total_token_usage"] = (
-                usage_tracker.get_summary()
+            # aggregate total cost once
+            dpr.total_cost_usd = sum(
+                m.total_cost_usd  # type: ignore[attr-defined]
+                for m in dpr.total_metrics
+                if m and getattr(m, "total_cost_usd", None) is not None
             )
 
-            self.logger.info(
-                f"Document processing completed for document: {document_id}"
-            )
-            return extended_response
-
+            dpr.timings.total_duration = time.perf_counter() - start_total
+            self.logger.info("Document processing completed.")
+            return dpr
         finally:
-            # Ensure logs are captured even if an exception occurs
-            if extended_response and extended_response.processing_metadata:
-                extended_response.processing_metadata["logs"] = (
-                    self._transcript.dump()
-                )
-            elif extended_response:
-                # Create processing_metadata if it doesn't exist
-                extended_response.processing_metadata = {
-                    "logs": self._transcript.dump()
-                }
-            # Always remove the handler when done
+            dpr.logs = self._transcript.dump()
             logging.getLogger().removeHandler(self._transcript)

@@ -1,7 +1,15 @@
+# ----------------------------------------------------------------------
+# Standard library
 import logging
+import re
 from abc import ABC, abstractmethod
 
-from ragbandit.schema import ExtendedOCRResponse
+# Project
+from ragbandit.schema import (
+    ProcessingResult,
+    Chunk,
+    ChunkingResult,
+)
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
@@ -31,29 +39,26 @@ class BaseChunker(ABC):
     @abstractmethod
     def chunk(
         self,
-        response: ExtendedOCRResponse,
+        document: ProcessingResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> list[dict[str, any]]:
+    ) -> ChunkingResult:
         """
-        Chunk the document content from an ExtendedOCRResponse.
+        Chunk the document content from a ProcessingResult.
 
         Args:
-            response: The ExtendedOCRResponse containing
+            document: The ProcessingResult containing
                       document content to chunk
             usage_tracker: Optional tracker for token usage during chunking
 
         Returns:
-            A list of chunk dictionaries, where each chunk contains at minimum:
-            - chunk_text: The text content of the chunk
-            - page_index: The index of the page this chunk comes from
-
-        Additional fields may be added by specific chunker implementations.
+            A `ChunkingResult` containing a list of `Chunk` objects and
+            optional metrics.
         """
         raise NotImplementedError
 
     def merge_small_chunks(
-        self, chunks: list[dict[str, any]], min_size: int
-    ) -> list[dict[str, any]]:
+        self, chunks: list[Chunk], min_size: int
+    ) -> list[Chunk]:
         """
         Merge small chunks with adjacent chunks to ensure minimum chunk size.
 
@@ -73,7 +78,7 @@ class BaseChunker(ABC):
 
         while i < n:
             current_chunk = chunks[i]
-            current_text = current_chunk["chunk_text"]
+            current_text = current_chunk.text
 
             # Check if this chunk is "small"
             if len(current_text) < min_size:
@@ -81,21 +86,24 @@ class BaseChunker(ABC):
                 next_chunk_exists = (i + 1) < n
                 if next_chunk_exists:
                     next_chunk_same_page = (
-                        chunks[i + 1]["page_index"]
-                        == current_chunk["page_index"]
+                        chunks[i + 1].metadata.page_index
+                        == current_chunk.metadata.page_index
                     )
                 else:
                     next_chunk_same_page = False
 
                 if i < n - 1 and next_chunk_same_page:
                     # Merge current with the next chunk
-                    current_chunk["chunk_text"] += (
-                        " " + chunks[i + 1]["chunk_text"]
-                    )
+                    current_chunk.text += (" " + chunks[i + 1].text)
 
                     # Merge images if they exist
-                    if "images" in current_chunk and "images" in chunks[i + 1]:
-                        current_chunk["images"].extend(chunks[i + 1]["images"])
+                    if (
+                        current_chunk.metadata.images
+                        and chunks[i + 1].metadata.images
+                    ):
+                        current_chunk.metadata.images.extend(
+                            chunks[i + 1].metadata.images
+                        )
 
                     # We've used chunk i+1, so skip it
                     i += 2
@@ -107,17 +115,15 @@ class BaseChunker(ABC):
                     # PREVIOUS chunk in 'merged'
                     if merged:
                         # Merge current chunk into the last chunk in 'merged'
-                        merged[-1]["chunk_text"] += (
-                            " " + current_chunk["chunk_text"]
-                        )
+                        merged[-1].text += (" " + current_chunk.text)
 
                         # Merge images if they exist
                         if (
-                            "images" in merged[-1]
-                            and "images" in current_chunk
+                            merged[-1].metadata.images
+                            and current_chunk.metadata.images
                         ):
-                            merged[-1]["images"].extend(
-                                current_chunk["images"]
+                            merged[-1].metadata.images.extend(
+                                current_chunk.metadata.images
                             )
                     else:
                         # If there's no previous chunk in 'merged', just add it
@@ -132,8 +138,8 @@ class BaseChunker(ABC):
         return merged
 
     def process_chunks(
-        self, chunks: list[dict[str, any]]
-    ) -> list[dict[str, any]]:
+        self, chunks: list[Chunk]
+    ) -> list[Chunk]:
         """
         Optional post-processing of chunks after initial chunking.
         This can be overridden by subclasses to
@@ -147,29 +153,44 @@ class BaseChunker(ABC):
         """
         return chunks
 
-    def extend_response(
-        self, response: ExtendedOCRResponse, chunks: list[dict[str, any]]
-    ) -> ExtendedOCRResponse:
+    # ------------------------------------------------------------------
+    # Shared helpers
+    def attach_images(
+        self,
+        chunks: list[Chunk],
+        proc_result: ProcessingResult,
+    ) -> list[Chunk]:
+        """Populate each Chunk's metadata.images with inlined image data.
+
+        Looks for `![img-XX.jpeg](img-XX.jpeg)` markers inside the chunk text
+        and copies the matching `image_base64` from the corresponding page's
+        images collection.
         """
-        Extend the response with chunk metadata.
 
-        Args:
-            response: ExtendedOCRResponse to update
-            chunks: The chunks produced by this chunker
+        img_pattern = re.compile(r"!\[img-\d+\.jpeg\]\(img-\d+\.jpeg\)")
 
-        Returns:
-            Updated ExtendedOCRResponse
-        """
-        if response.processing_metadata is None:
-            response.processing_metadata = {}
+        for chunk in chunks:
+            images_in_chunk = img_pattern.findall(chunk.text)
+            if not images_in_chunk:
+                # No image markers, ensure empty list and continue
+                chunk.metadata.images = []
+                continue
 
-        # Store chunking results in processing_metadata
-        response.processing_metadata[self.__repr__()] = {
-            "chunk_count": len(chunks),
-            "chunks": chunks,
-        }
+            page_idx = chunk.metadata.page_index
+            rel_images = proc_result.pages[page_idx].images or []
+            chunk.metadata.images = []
 
-        return response
+            for img_tag in images_in_chunk:
+                img_id = img_tag.split("[")[1].split("]")[0]
+                for ocr_img in rel_images:
+                    if ocr_img.id == img_id:
+                        chunk.metadata.images.append(
+                            {"img_id": img_id,
+                             "image_base64": ocr_img.image_base64}
+                        )
+                        break
+
+        return chunks
 
     def __str__(self) -> str:
         """Return a string representation of the chunker."""

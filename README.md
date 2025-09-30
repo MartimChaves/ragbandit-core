@@ -46,7 +46,7 @@ doc_pipeline = DocumentPipeline(
     ],
 )
 
-extended_response = doc_pipeline.process(file_path, "1")
+extended_response = doc_pipeline.process(file_path)
 
 ```
 
