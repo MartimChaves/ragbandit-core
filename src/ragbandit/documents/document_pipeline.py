@@ -235,8 +235,10 @@ class DocumentPipeline:
         # ---------------- helpers ----------------
         def _on_success(attr):
             def handler(res):
+                # 1. Set the result (save the step result to DPR)
                 setattr(dpr, attr, res)
-                # res may be a single result or a list of results
+                # 2. Set the metrics of the result to total metrics
+                # - res may be a single result or a list of results
                 if isinstance(res, list):
                     dpr.total_metrics.extend(
                         [r.metrics for r in res if r.metrics]
