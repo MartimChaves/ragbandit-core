@@ -9,6 +9,7 @@ from ragbandit.schema import (
     ProcessingResult,
     Chunk,
     ChunkingResult,
+    Image,
 )
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
@@ -185,8 +186,7 @@ class BaseChunker(ABC):
                 for ocr_img in rel_images:
                     if ocr_img.id == img_id:
                         chunk.metadata.images.append(
-                            {"img_id": img_id,
-                             "image_base64": ocr_img.image_base64}
+                            Image(id=img_id, image_base64=ocr_img.image_base64)
                         )
                         break
 
