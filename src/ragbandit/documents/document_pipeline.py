@@ -48,19 +48,28 @@ class DocumentPipeline:
 
     def __init__(
         self,
-        chunker: BaseChunker,
-        embedder: BaseEmbedder,
-        ocr_processor: BaseOCR,
-        processors: list[BaseProcessor] = None,
-        logger: logging.Logger = None,
+        ocr_processor: BaseOCR | None = None,
+        processors: list[BaseProcessor] | None = None,
+        chunker: BaseChunker | None = None,
+        embedder: BaseEmbedder | None = None,
+        logger: logging.Logger | None = None,
     ):
         """Initialize a new document processing pipeline.
 
+        All components are optional to allow running
+        individual steps independently.
+        For full pipeline execution via process(),
+        all components must be provided.
+
         Args:
-            chunker: Chunker to use for document chunking
-            embedder: Embedder to use for chunk embedding
-            ocr_processor: OCR processor to use
-            processors: List of document processors to execute in sequence
+            ocr_processor: OCR processor to use (required for run_ocr
+                           and process)
+            processors: List of document processors to execute in
+                        sequence
+            chunker: Chunker to use for document chunking (required
+                     for run_chunker and process)
+            embedder: Embedder to use for chunk embedding (required
+                      for run_embedder and process)
             logger: Optional logger for pipeline events
         """
         self.ocr_processor = ocr_processor
@@ -102,7 +111,12 @@ class DocumentPipeline:
 
         Returns:
             OCRResult: The OCR result from the processor
+
+        Raises:
+            ValueError: If ocr_processor is not configured
         """
+        if not self.ocr_processor:
+            raise ValueError("ocr_processor is required for OCR operation")
         return self.ocr_processor.process(pdf_filepath)
 
     def run_processors(
@@ -153,11 +167,16 @@ class DocumentPipeline:
         """Chunk the document using the configured chunker.
 
         Args:
-            proc_result: The ProcessingResult to chunk
+            doc: The ProcessingResult or OCRResult to chunk
 
         Returns:
             A ChunkingResult object
+
+        Raises:
+            ValueError: If chunker is not configured
         """
+        if not self.chunker:
+            raise ValueError("chunker is required for chunking operation")
         proc_result = (
             doc
             if isinstance(doc, ProcessingResult)
@@ -176,11 +195,15 @@ class DocumentPipeline:
 
         Args:
             chunk_result: The ChunkingResult to embed
-            usage_tracker: Optional token usage tracker
 
         Returns:
             An EmbeddingResult containing embeddings for each chunk
+
+        Raises:
+            ValueError: If embedder is not configured
         """
+        if not self.embedder:
+            raise ValueError("embedder is required for embedding operation")
         usage_tracker = TokenUsageTracker()
         embedding_result = self.embedder.embed_chunks(
             chunk_result, usage_tracker
@@ -215,7 +238,24 @@ class DocumentPipeline:
         self,
         pdf_filepath: str
     ) -> DocumentPipelineResult:
-        """Run the configured pipeline steps in order."""
+        """Run the configured pipeline steps in order.
+
+        Raises:
+            ValueError: If any required component is not configured
+        """
+        # Validate all components are present for full pipeline execution
+        if not self.ocr_processor:
+            raise ValueError(
+                "ocr_processor is required for full pipeline execution"
+            )
+        if not self.chunker:
+            raise ValueError(
+                "chunker is required for full pipeline execution"
+            )
+        if not self.embedder:
+            raise ValueError(
+                "embedder is required for full pipeline execution"
+            )
 
         start_total = time.perf_counter()
         dpr = DocumentPipelineResult(
