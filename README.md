@@ -9,7 +9,7 @@ Core utilities for:
 ## Quick start
 
 ```bash
-pip install -e .[web]
+pip install ragbandit-core
 ```
 
 ```python
