@@ -4,11 +4,30 @@ This document outlines the tasks needed to standardize and improve the ragbandit
 
 ## Phase 1: Result Schema Standardization (Critical)
 
+### Task 1.0: Terminology Refactor (Foundation)
+- [ ] Rename `ProcessingResult` to `RefiningResult` in schema
+- [ ] Rename `ProcessedPage` to `RefinedPage` in schema
+- [ ] Rename `ProcessingTraceItem` to `RefiningTraceItem` in schema
+- [ ] Rename `BaseProcessor` to `BaseRefiner` in base class
+- [ ] Update all processor implementations to inherit from `BaseRefiner`
+- [ ] Rename `ReferencesProcessor` to `ReferencesRefiner`
+- [ ] Rename `FootnoteProcessor` to `FootnoteRefiner`
+- [ ] Update `DocumentPipeline` to use "refining" terminology
+- [ ] Rename `run_processors()` to `run_refiners()` in pipeline
+- [ ] Update pipeline step key from `"processing"` to `"refining"`
+- [ ] Update `StepReport.processing` to `StepReport.refining`
+- [ ] Update `TimingMetrics.processing` to `TimingMetrics.refining`
+- [ ] Update all docstrings and comments to use "refining" terminology
+- [ ] Update README.md examples to use new terminology
+- [ ] Update imports in `__init__.py` files
+
+**Rationale**: Eliminates terminology conflict between "Document Processing" (overall pipeline) and "Processing" (specific step). New terminology: OCR → Refining → Chunking → Embedding.
+
 ### Task 1.1: Update Schema Definitions
 - [ ] Add `component_name: str` field to `OCRResult`
 - [ ] Add `component_config: dict` field to `OCRResult`
-- [ ] Rename `processor_name` to `component_name` in `ProcessingResult` (for consistency)
-- [ ] Add `component_config: dict` field to `ProcessingResult`
+- [ ] Rename `refiner_name` to `component_name` in `RefiningResult` (for consistency)
+- [ ] Add `component_config: dict` field to `RefiningResult`
 - [ ] Add `component_name: str` field to `ChunkingResult`
 - [ ] Add `component_config: dict` field to `ChunkingResult`
 - [ ] Add `component_name: str` field to `EmbeddingResult`
@@ -17,8 +36,8 @@ This document outlines the tasks needed to standardize and improve the ragbandit
 ### Task 1.2: Add Configuration Methods to Base Classes
 - [ ] Add `get_config() -> dict` abstract method to `BaseOCR`
 - [ ] Add `get_name() -> str` method to `BaseOCR` (default: `self.__class__.__name__`)
-- [ ] Add `get_config() -> dict` abstract method to `BaseProcessor`
-- [ ] Add `get_name() -> str` method to `BaseProcessor`
+- [ ] Add `get_config() -> dict` abstract method to `BaseRefiner`
+- [ ] Add `get_name() -> str` method to `BaseRefiner`
 - [ ] Add `get_config() -> dict` abstract method to `BaseChunker`
 - [ ] Add `get_name() -> str` method to `BaseChunker`
 - [ ] Add `get_config() -> dict` abstract method to `BaseEmbedder`
@@ -28,10 +47,10 @@ This document outlines the tasks needed to standardize and improve the ragbandit
 - [ ] Implement `get_config()` in `MistralOCRDocument`
 - [ ] Update `MistralOCRDocument.process()` to populate `component_name` and `component_config` in `OCRResult`
 
-### Task 1.4: Implement Configuration Methods in Processors
-- [ ] Implement `get_config()` in `ReferencesProcessor`
-- [ ] Implement `get_config()` in `FootnoteProcessor`
-- [ ] Update processor implementations to populate `component_name` and `component_config` in `ProcessingResult`
+### Task 1.4: Implement Configuration Methods in Refiners
+- [ ] Implement `get_config()` in `ReferencesRefiner`
+- [ ] Implement `get_config()` in `FootnoteRefiner`
+- [ ] Update refiner implementations to populate `component_name` and `component_config` in `RefiningResult`
 
 ### Task 1.5: Implement Configuration Methods in Chunkers
 - [ ] Implement `get_config()` in `FixedSizeChunker`
