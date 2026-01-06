@@ -1,26 +1,26 @@
 """
-References processor for detecting and removing reference
+References refiner for detecting and removing reference
 sections from documents.
 
-This processor identifies the references section header in a document and
+This refiner identifies the references section header in a document and
 extracts the references content, removing it from the main document text.
 """
 
 import re
 from difflib import SequenceMatcher
 
-from ragbandit.documents.processors.base_processor import BaseProcessor
+from ragbandit.documents.refiners.base_refiner import BaseRefiner
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
-from ragbandit.prompt_tools.references_processor_tools import (
+from ragbandit.prompt_tools.references_refiner_tools import (
     detect_references_header_tool,
 )
-from ragbandit.schema import OCRResult, ProcessingResult
+from ragbandit.schema import OCRResult, RefiningResult
 
 
-class ReferencesProcessor(BaseProcessor):
-    """Processor for detecting and removing references sections from documents.
+class ReferencesRefiner(BaseRefiner):
+    """Refiner for detecting and removing references sections from documents.
 
-    This processor:
+    This refiner:
     1. Extracts headers from the OCR pages
     2. Identifies the references section header using an LLM
     3. Removes the references section from the document
@@ -28,50 +28,50 @@ class ReferencesProcessor(BaseProcessor):
     """
 
     def __init__(self, name: str | None = None, api_key: str | None = None):
-        """Initialize the references processor.
+        """Initialize the references refiner.
 
         Args:
-            name: Optional name for the processor
+            name: Optional name for the refiner
             api_key: API key for LLM services
         """
         super().__init__(name, api_key)
 
     def process(
         self,
-        document: OCRResult | ProcessingResult,
+        document: OCRResult | RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> ProcessingResult:
+    ) -> RefiningResult:
         """Process OCR pages to detect and remove references.
 
         Args:
-            document: OCRResult or ProcessingResult to process
+            document: OCRResult or RefiningResult to process
             usage_tracker: Token usage tracker for LLM calls
 
         Returns:
             Tuple containing:
-            - Modified ProcessingResult with references removed
+            - Modified RefiningResult with references removed
             - Extracted references as markdown
         """
 
         # Normalize input once
-        proc_input = self.ensure_processing_result(
-                        document, processor_name=str(self)
+        ref_input = self.ensure_refining_result(
+                        document, refiner_name=str(self)
                     )
 
-        proc_result, references_markdown = self.remove_refs(
-            proc_input, usage_tracker
+        ref_result, references_markdown = self.remove_refs(
+            ref_input, usage_tracker
         )
 
-        # Save extracted references into processing result metadata
+        # Save extracted references into refining result metadata
         if references_markdown:
-            if proc_result.extracted_data is None:
-                proc_result.extracted_data = {}
+            if ref_result.extracted_data is None:
+                ref_result.extracted_data = {}
 
-            proc_result.extracted_data["references_markdown"] = (
+            ref_result.extracted_data["references_markdown"] = (
                 references_markdown
             )
 
-        return proc_result
+        return ref_result
 
     def find_best_match(
         self, target: str, string_list: list[str]
@@ -101,53 +101,53 @@ class ReferencesProcessor(BaseProcessor):
 
     def remove_refs(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ProcessingResult, str]:
+    ) -> tuple[RefiningResult, str]:
         """Remove references section from document and extract as markdown.
 
         This method identifies the references section in a document,
         extracts it, and removes it from the original document.
 
         Args:
-            proc_result: The document to process (ProcessingResult)
+            ref_result: The document to refine (RefiningResult)
             usage_tracker: Optional tracker for token usage in LLM calls
 
         Returns:
             Tuple containing:
-            - Modified ProcessingResult with references removed
+            - Modified RefiningResult with references removed
             - Extracted references as markdown
         """
         # Extract headers and identify references section
-        headers = self._extract_headers(proc_result)
+        headers = self._extract_headers(ref_result)
         refs_header, refs_header_index = self._identify_references_header(
             headers, usage_tracker
         )
 
         # If no references header found, return original document unchanged
         if not refs_header:
-            return proc_result, ""
+            return ref_result, ""
 
         # Find next header (if any) after references
         next_header = self._find_next_header(headers, refs_header_index)
 
         # Find page boundaries of references section
         boundaries = self._find_reference_boundaries(
-            proc_result, refs_header, next_header
+            ref_result, refs_header, next_header
         )
 
         # If boundaries couldn't be determined, return original document
         if not boundaries:
-            return proc_result, ""
+            return ref_result, ""
 
         # Extract references and modify document
-        return self._extract_references(proc_result, boundaries)
+        return self._extract_references(ref_result, boundaries)
 
-    def _extract_headers(self, proc_result: ProcessingResult) -> list[str]:
+    def _extract_headers(self, ref_result: RefiningResult) -> list[str]:
         """Extract all headers from document.
 
         Args:
-            proc_result: ProcessingResult containing document pages
+            ref_result: RefiningResult containing document pages
 
         Returns:
             List of headers found in the document
@@ -160,7 +160,7 @@ class ReferencesProcessor(BaseProcessor):
 
         # Search for headers in complete markdown string
         full_markdown = ""
-        for page in proc_result.pages:
+        for page in ref_result.pages:
             full_markdown += page.markdown
 
         return header_regex.findall(full_markdown)
@@ -210,14 +210,14 @@ class ReferencesProcessor(BaseProcessor):
 
     def _find_reference_boundaries(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         refs_header: str,
         next_header: str | None,
     ) -> dict | None:
         """Find the boundaries of the references section.
 
         Args:
-            proc_result: ProcessingResult containing document pages
+            ref_result: RefiningResult containing document pages
             refs_header: The identified references header
             next_header: The next header after references (if any)
 
@@ -228,7 +228,7 @@ class ReferencesProcessor(BaseProcessor):
         next_header_page = -1
 
         # Find the pages where references start and end
-        for page in proc_result.pages:
+        for page in ref_result.pages:
             if refs_header in page.markdown:
                 refs_page = page.index
             if next_header is not None and next_header in page.markdown:
@@ -239,14 +239,14 @@ class ReferencesProcessor(BaseProcessor):
             return None
 
         # Get the location (page, index) where references start
-        refs_page_markdown = proc_result.pages[refs_page].markdown
+        refs_page_markdown = ref_result.pages[refs_page].markdown
         references_start_index = refs_page_markdown.find(refs_header)
         references_start = (refs_page, references_start_index)
 
         # Determine where references end
         references_end = None
         if next_header is not None and next_header_page != -1:
-            next_header_page_markdown = proc_result.pages[
+            next_header_page_markdown = ref_result.pages[
                 next_header_page
             ].markdown
             references_end_index = next_header_page_markdown.find(next_header)
@@ -261,12 +261,12 @@ class ReferencesProcessor(BaseProcessor):
         }
 
     def _extract_references(
-        self, proc_result: ProcessingResult, boundaries: dict
-    ) -> tuple[ProcessingResult, str]:
+        self, ref_result: RefiningResult, boundaries: dict
+    ) -> tuple[RefiningResult, str]:
         """Extract references from document based on boundaries.
 
         Args:
-            proc_result: ProcessingResult containing document pages
+            ref_result: RefiningResult containing document pages
             boundaries: Dictionary with reference section boundaries
 
         Returns:
@@ -278,27 +278,27 @@ class ReferencesProcessor(BaseProcessor):
         # If references end at the end of document
         if references_end is None:
             return self._extract_references_at_end(
-                proc_result, references_start
+                ref_result, references_start
             )
 
         # If references are contained within a single page
         if references_end[0] == references_start[0]:
             return self._extract_references_same_page(
-                proc_result, references_start, references_end
+                ref_result, references_start, references_end
             )
 
         # If references span multiple pages
         return self._extract_references_multi_page(
-            proc_result, references_start, references_end
+            ref_result, references_start, references_end
         )
 
     def _extract_references_at_end(
-        self, proc_result: ProcessingResult, references_start: tuple[int, int]
-    ) -> tuple[ProcessingResult, str]:
+        self, ref_result: RefiningResult, references_start: tuple[int, int]
+    ) -> tuple[RefiningResult, str]:
         """Extract references when they are the last section in the document.
 
         Args:
-            proc_result: ProcessingResult containing document pages
+            ref_result: RefiningResult containing document pages
             references_start: Tuple (page_index, char_index) where
                               references start
 
@@ -308,14 +308,14 @@ class ReferencesProcessor(BaseProcessor):
         references_markdown = ""
         start_page = True
 
-        for page_index in range(references_start[0], len(proc_result.pages)):
+        for page_index in range(references_start[0], len(ref_result.pages)):
             if start_page:
                 # Extract references text from first page,
                 # preserve text before references
-                references_markdown += proc_result.pages[page_index].markdown[
+                references_markdown += ref_result.pages[page_index].markdown[
                     references_start[1]:
                 ]
-                proc_result.pages[page_index].markdown = proc_result.pages[
+                ref_result.pages[page_index].markdown = ref_result.pages[
                     page_index
                 ].markdown[0:references_start[1]]
                 start_page = False
@@ -323,21 +323,21 @@ class ReferencesProcessor(BaseProcessor):
 
             # For subsequent pages, extract all content
             # (assumed to be references)
-            references_markdown += proc_result.pages[page_index].markdown
-            proc_result.pages[page_index].markdown = ""
+            references_markdown += ref_result.pages[page_index].markdown
+            ref_result.pages[page_index].markdown = ""
 
-        return proc_result, references_markdown
+        return ref_result, references_markdown
 
     def _extract_references_same_page(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         references_start: tuple[int, int],
         references_end: tuple[int, int],
-    ) -> tuple[ProcessingResult, str]:
+    ) -> tuple[RefiningResult, str]:
         """Extract references when they start and end on the same page.
 
         Args:
-            proc_result: ProcessingResult containing document pages
+            ref_result: RefiningResult containing document pages
             references_start: Tuple (page_index, char_index) where
                               references start
             references_end: Tuple (page_index, char_index) where references end
@@ -348,28 +348,28 @@ class ReferencesProcessor(BaseProcessor):
         page_idx = references_start[0]
 
         # Extract the references section
-        references_markdown = proc_result.pages[page_idx].markdown[
+        references_markdown = ref_result.pages[page_idx].markdown[
             references_start[1]:references_end[1]
         ]
 
         # Remove references section from the page
-        proc_result.pages[page_idx].markdown = (
-            proc_result.pages[page_idx].markdown[0:references_start[1]]
-            + proc_result.pages[page_idx].markdown[references_end[1]:]
+        ref_result.pages[page_idx].markdown = (
+            ref_result.pages[page_idx].markdown[0:references_start[1]]
+            + ref_result.pages[page_idx].markdown[references_end[1]:]
         )
 
-        return proc_result, references_markdown
+        return ref_result, references_markdown
 
     def _extract_references_multi_page(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         references_start: tuple[int, int],
         references_end: tuple[int, int],
-    ) -> tuple[ProcessingResult, str]:
+    ) -> tuple[RefiningResult, str]:
         """Extract references when they span multiple pages.
 
         Args:
-            proc_result: ProcessingResult containing document pages
+            ref_result: RefiningResult containing document pages
             references_start: Tuple (page_index, char_index) where
                               references start
             references_end: Tuple (page_index, char_index) where references end
@@ -383,26 +383,26 @@ class ReferencesProcessor(BaseProcessor):
         for page_index in range(references_start[0], references_end[0] + 1):
             # First page with references
             if page_index == references_start[0]:
-                references_markdown += proc_result.pages[page_index].markdown[
+                references_markdown += ref_result.pages[page_index].markdown[
                     references_start[1]:
                 ]
-                proc_result.pages[page_index].markdown = proc_result.pages[
+                ref_result.pages[page_index].markdown = ref_result.pages[
                     page_index
                 ].markdown[0:references_start[1]]
                 continue
 
             # Last page with references
             if page_index == references_end[0]:
-                references_markdown += proc_result.pages[page_index].markdown[
+                references_markdown += ref_result.pages[page_index].markdown[
                     0:references_end[1]
                 ]
-                proc_result.pages[page_index].markdown = proc_result.pages[
+                ref_result.pages[page_index].markdown = ref_result.pages[
                     page_index
                 ].markdown[references_end[1]:]
                 continue
 
             # Middle pages (contain only references)
-            references_markdown += proc_result.pages[page_index].markdown
-            proc_result.pages[page_index].markdown = ""
+            references_markdown += ref_result.pages[page_index].markdown
+            ref_result.pages[page_index].markdown = ""
 
-        return proc_result, references_markdown
+        return ref_result, references_markdown

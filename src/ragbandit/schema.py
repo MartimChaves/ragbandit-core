@@ -42,8 +42,7 @@ class TimingMetrics(BaseModel):
     """Metrics for pipeline step durations in seconds."""
     total_duration: float | None = None
     ocr: float | None = None
-    # processing_steps: list[dict[str, float]] | None = None
-    processing: float | None = None
+    refining: float | None = None
     chunking: float | None = None
     embedding: float | None = None
 
@@ -99,30 +98,30 @@ class OCRResult(BaseModel):
     metrics: list[TokenUsageMetrics | PagesProcessedMetrics] | None = None
 
 ##########################################
-#               Processing               #
+#               Refining                 #
 ##########################################
 
 
-class ProcessedPage(BasePage):
-    """Represents a single page after text processors have been applied."""
+class RefinedPage(BasePage):
+    """Represents a single page after refiners have been applied."""
     pass
 
 
-class ProcessingTraceItem(BaseModel):
-    """Trace of a single processor's execution."""
-    step_name: str  # Name of the step in the processing
+class RefiningTraceItem(BaseModel):
+    """Trace of a single refiner's execution."""
+    step_name: str  # Name of the step in the refining process
     summary: str
     duration: float  # Duration in seconds
 
 
-class ProcessingResult(BaseModel):
-    """Represents the output of the text processors."""
-    processor_name: str
+class RefiningResult(BaseModel):
+    """Represents the output of the refiners."""
+    refiner_name: str
     processed_at: datetime
-    pages: list[ProcessedPage]  # The text content, now structured per page
-    processing_trace: list[ProcessingTraceItem]
+    pages: list[RefinedPage]  # The text content, now structured per page
+    refining_trace: list[RefiningTraceItem]
     extracted_data: dict[str, object]  # For footnotes, references, etc.
-    processing_duration: float | None = None
+    refining_duration: float | None = None
     metrics: TokenUsageMetrics | None = None
 
 ##########################################
@@ -183,7 +182,7 @@ class StepStatus(str, Enum):
 
 class StepReport(BaseModel):
     ocr: StepStatus | None = None
-    processing: StepStatus | None = None
+    refining: StepStatus | None = None
     chunking: StepStatus | None = None
     embedding: StepStatus | None = None
 
@@ -199,7 +198,7 @@ class DocumentPipelineResult(BaseModel):
     ) = None
     total_cost_usd: float | None = None
     ocr_result: OCRResult | None = None
-    processing_results: list[ProcessingResult] | None = None
+    refining_results: list[RefiningResult] | None = None
     chunking_result: ChunkingResult | None = None
     embedding_result: EmbeddingResult | None = None
     step_report: StepReport

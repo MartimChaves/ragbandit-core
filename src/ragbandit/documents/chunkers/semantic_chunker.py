@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from ragbandit.schema import (
-    ProcessingResult,
+    RefiningResult,
     Chunk,
     ChunkMetadata,
     ChunkingResult,
@@ -142,14 +142,14 @@ class SemanticChunker(BaseChunker):
 
     def chunk(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
     ) -> ChunkingResult:
         """
         Chunk the document using semantic chunking.
 
         Args:
-            proc_result: The ProcessingResult containing
+            ref_result: The RefiningResult containing
                       document content to chunk
             usage_tracker: Tracker for token usage during chunking
 
@@ -159,13 +159,13 @@ class SemanticChunker(BaseChunker):
         self.logger.info("Starting semantic chunking")
 
         # Get the pages from the response
-        pages = proc_result.pages
+        pages = ref_result.pages
 
         # Perform semantic chunking
         chunks = self.semantic_chunk_pages(pages, usage_tracker)
 
         # Attach image data to chunks using shared helper
-        chunks = self.attach_images(chunks, proc_result)
+        chunks = self.attach_images(chunks, ref_result)
 
         # Merge small chunks if needed
         chunks = self.process_chunks(chunks)

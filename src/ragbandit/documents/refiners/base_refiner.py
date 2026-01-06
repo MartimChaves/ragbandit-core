@@ -1,22 +1,22 @@
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from ragbandit.schema import OCRResult, ProcessingResult, ProcessedPage
+from ragbandit.schema import OCRResult, RefiningResult, RefinedPage
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 
-class BaseProcessor(ABC):
+class BaseRefiner(ABC):
     """
-    Base class or mix-in for individual processors.
+    Base class or mix-in for individual refiners.
     Subclasses override `process()` and, optionally, `extend_response()`.
     """
 
     def __init__(self, name: str | None = None, api_key: str | None = None):
         """
-        Initialize the processor.
+        Initialize the refiner.
 
         Args:
-            name: Optional name for the processor
+            name: Optional name for the refiner
             api_key: API key for LLM services
         """
         # Hierarchical names make it easy to filter later:
@@ -30,59 +30,59 @@ class BaseProcessor(ABC):
     @abstractmethod
     def process(
         self,
-        document: OCRResult | ProcessingResult,
+        document: OCRResult | RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> ProcessingResult:
+    ) -> RefiningResult:
         """
         Do one step of work and return:
-          * a (possibly modified) ProcessingResult
-          * a dict of metadata specific to this processor
+          * a (possibly modified) RefiningResult
+          * a dict of metadata specific to this refiner
 
         Args:
-            response: The OCR or intermediate processing result to process.
+            response: The OCR or intermediate refining result to process.
                 This can be either an `OCRResult` (raw OCR output) or
-                a `ProcessingResult` (output of a previous processor).
+                a `RefiningResult` (output of a previous refiner).
             usage_tracker: Optional token usage tracker
         """
         raise NotImplementedError
 
     # ----------------------------------------------------------------------
     def __str__(self) -> str:
-        """Return a string representation of the processor."""
+        """Return a string representation of the refiner."""
         return self.__class__.__name__
 
     def __repr__(self) -> str:
-        """Return a string representation of the processor."""
+        """Return a string representation of the refiner."""
         return f"{self.__class__.__name__}()"
 
     # ----------------------------------------------------------------------
     # Utility helpers
     @staticmethod
-    def ensure_processing_result(
-        document: OCRResult | ProcessingResult,
-        processor_name: str = "bootstrap",
-    ) -> ProcessingResult:
-        """Ensure the incoming `document` is a `ProcessingResult`.
+    def ensure_refining_result(
+        document: OCRResult | RefiningResult,
+        refiner_name: str = "bootstrap",
+    ) -> RefiningResult:
+        """Ensure the incoming `document` is a `RefiningResult`.
 
-        If an `OCRResult` is supplied (as is the case for the first processor
-        in a pipeline), it will be converted to a shallow `ProcessingResult` so
+        If an `OCRResult` is supplied (as is the case for the first refiner
+        in a pipeline), it will be converted to a shallow `RefiningResult` so
         that downstream logic can assume a consistent type.
         """
 
-        # Always create a fresh ProcessingResult so that timestamps, metrics,
-        # and extracted data do not roll over between processors.
+        # Always create a fresh RefiningResult so that timestamps, metrics,
+        # and extracted data do not roll over between refiners.
 
         source_pages = document.pages if hasattr(document, "pages") else []
 
-        pages_processed = [
-            ProcessedPage(**page.model_dump()) for page in source_pages
+        pages_refined = [
+            RefinedPage(**page.model_dump()) for page in source_pages
         ]
 
-        return ProcessingResult(
-            processor_name=processor_name,
+        return RefiningResult(
+            refiner_name=refiner_name,
             processed_at=datetime.now(timezone.utc),
-            pages=pages_processed,
-            processing_trace=[],
+            pages=pages_refined,
+            refining_trace=[],
             extracted_data={},
             metrics=None,
         )

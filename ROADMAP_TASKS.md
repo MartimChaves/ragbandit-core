@@ -4,22 +4,27 @@ This document outlines the tasks needed to standardize and improve the ragbandit
 
 ## Phase 1: Result Schema Standardization (Critical)
 
-### Task 1.0: Terminology Refactor (Foundation)
-- [ ] Rename `ProcessingResult` to `RefiningResult` in schema
-- [ ] Rename `ProcessedPage` to `RefinedPage` in schema
-- [ ] Rename `ProcessingTraceItem` to `RefiningTraceItem` in schema
-- [ ] Rename `BaseProcessor` to `BaseRefiner` in base class
-- [ ] Update all processor implementations to inherit from `BaseRefiner`
-- [ ] Rename `ReferencesProcessor` to `ReferencesRefiner`
-- [ ] Rename `FootnoteProcessor` to `FootnoteRefiner`
-- [ ] Update `DocumentPipeline` to use "refining" terminology
-- [ ] Rename `run_processors()` to `run_refiners()` in pipeline
-- [ ] Update pipeline step key from `"processing"` to `"refining"`
-- [ ] Update `StepReport.processing` to `StepReport.refining`
-- [ ] Update `TimingMetrics.processing` to `TimingMetrics.refining`
-- [ ] Update all docstrings and comments to use "refining" terminology
-- [ ] Update README.md examples to use new terminology
-- [ ] Update imports in `__init__.py` files
+### Task 1.0: Terminology Refactor (Foundation) ✅ COMPLETE
+- [x] Rename `ProcessingResult` to `RefiningResult` in schema
+- [x] Rename `ProcessedPage` to `RefinedPage` in schema
+- [x] Rename `ProcessingTraceItem` to `RefiningTraceItem` in schema
+- [x] Rename `BaseProcessor` to `BaseRefiner` in base class
+- [x] Update all processor implementations to inherit from `BaseRefiner`
+- [x] Rename `ReferencesProcessor` to `ReferencesRefiner`
+- [x] Rename `FootnoteProcessor` to `FootnoteRefiner`
+- [x] Update `DocumentPipeline` to use "refining" terminology
+- [x] Rename `run_processors()` to `run_refiners()` in pipeline
+- [x] Update pipeline step key from `"processing"` to `"refining"`
+- [x] Update `StepReport.processing` to `StepReport.refining`
+- [x] Update `TimingMetrics.processing` to `TimingMetrics.refining`
+- [x] Update all docstrings and comments to use "refining" terminology
+- [x] Update README.md examples to use new terminology
+- [x] Update imports in `__init__.py` files
+- [x] Rename `processors/` directory to `refiners/`
+- [x] Rename `*_processor.py` files to `*_refiner.py`
+- [x] Rename `*_processor_tools.py` files to `*_refiner_tools.py`
+- [x] Update variable names: `proc_*` to `ref_*`
+- [x] Update chunkers to use `RefiningResult`
 
 **Rationale**: Eliminates terminology conflict between "Document Processing" (overall pipeline) and "Processing" (specific step). New terminology: OCR → Refining → Chunking → Embedding.
 

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from ragbandit.schema import (
-    ProcessingResult,
+    RefiningResult,
     Chunk,
     ChunkMetadata,
     ChunkingResult,
@@ -36,14 +36,14 @@ class FixedSizeChunker(BaseChunker):
 
     def chunk(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
     ) -> ChunkingResult:
         """
         Chunk the document into fixed-size chunks.
 
         Args:
-            proc_result: The ProcessingResult containing
+            ref_result: The RefiningResult containing
                       document content to chunk
             usage_tracker: Optional tracker for token usage
                            (not used in this chunker)
@@ -52,10 +52,10 @@ class FixedSizeChunker(BaseChunker):
             A ChunkingResult containing Chunk objects
         """
         # 1. Generate raw chunks for each page
-        chunks = self._fixed_size_chunk_pages(proc_result)
+        chunks = self._fixed_size_chunk_pages(ref_result)
 
         # 2. Attach any inline images using BaseChunker helper
-        chunks = self.attach_images(chunks, proc_result)
+        chunks = self.attach_images(chunks, ref_result)
 
         # 3. Merge small chunks if needed
         chunks = self.process_chunks(chunks)
@@ -70,7 +70,7 @@ class FixedSizeChunker(BaseChunker):
     # ------------------------------------------------------------------
     # Internal helpers
     def _fixed_size_chunk_pages(
-        self, proc_result: ProcessingResult
+        self, ref_result: RefiningResult
     ) -> list[Chunk]:
         """Split each page into fixed-size chunks with optional overlap."""
 
@@ -82,7 +82,7 @@ class FixedSizeChunker(BaseChunker):
         chunks: list[Chunk] = []
 
         # Process each page
-        for page_index, page in enumerate(proc_result.pages):
+        for page_index, page in enumerate(ref_result.pages):
             page_text = page.markdown
 
             # Skip empty pages

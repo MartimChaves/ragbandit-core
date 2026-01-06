@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 # Project
 from ragbandit.schema import (
-    ProcessingResult,
+    RefiningResult,
     Chunk,
     ChunkingResult,
     Image,
@@ -40,14 +40,14 @@ class BaseChunker(ABC):
     @abstractmethod
     def chunk(
         self,
-        document: ProcessingResult,
+        document: RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
     ) -> ChunkingResult:
         """
-        Chunk the document content from a ProcessingResult.
+        Chunk the document content from a RefiningResult.
 
         Args:
-            document: The ProcessingResult containing
+            document: The RefiningResult containing
                       document content to chunk
             usage_tracker: Optional tracker for token usage during chunking
 
@@ -159,7 +159,7 @@ class BaseChunker(ABC):
     def attach_images(
         self,
         chunks: list[Chunk],
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
     ) -> list[Chunk]:
         """Populate each Chunk's metadata.images with inlined image data.
 
@@ -178,7 +178,7 @@ class BaseChunker(ABC):
                 continue
 
             page_idx = chunk.metadata.page_index
-            rel_images = proc_result.pages[page_idx].images or []
+            rel_images = ref_result.pages[page_idx].images or []
             chunk.metadata.images = []
 
             for img_tag in images_in_chunk:

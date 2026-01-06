@@ -10,8 +10,8 @@ from ragbandit.schema import OCRResult
 class BaseOCR(ABC):
     """Base class for OCR document processing.
 
-    This class provides the interface for OCR processing and a default
-    implementation using Mistral's OCR API.
+    This abstract class defines the interface that all OCR implementations
+    must follow. Subclasses should implement the process() method.
     """
 
     def __init__(self, logger: logging.Logger = None, **kwargs):
@@ -96,7 +96,7 @@ class BaseOCR(ABC):
         """Validate and prepare a PDF file for OCR processing.
 
         Args:
-            pdf_filepath: Path to the PDF file to process
+            pdf_filepath: Path to the PDF file to OCR
             encrypted: Whether the file is encrypted (default: True)
 
         Returns:
@@ -119,10 +119,10 @@ class BaseOCR(ABC):
         """Process a PDF file through OCR.
 
         Args:
-            pdf_filepath: Path to the PDF file to process
+            pdf_filepath: Path to the PDF file to OCR
 
         Returns:
-            OCRResult: The OCR result from the processor
+            OCRResult: The OCR result from the OCR processor
         """
         raise NotImplementedError("Subclasses must implement process method")
 
