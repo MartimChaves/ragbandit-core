@@ -12,21 +12,33 @@ from datetime import datetime, timezone
 class MistralEmbedder(BaseEmbedder):
     """Document embedder that uses Mistral AI's embedding models."""
 
+    # Valid model names for Mistral embeddings
+    VALID_MODELS = [
+        "mistral-embed",
+    ]
+
     def __init__(
         self,
         api_key: str,
         model: str = "mistral-embed",
-        name: str = None,
     ):
         """
         Initialize the Mistral embedder.
 
         Args:
             api_key: Mistral API key
-            model: Embedding model to use
-            name: Optional name for the embedder
+            model: Embedding model to use (must be in VALID_MODELS)
+
+        Raises:
+            ValueError: If model is not in VALID_MODELS
         """
-        super().__init__(name)
+        if model not in self.VALID_MODELS:
+            raise ValueError(
+                f"Invalid model '{model}'. "
+                f"Must be one of: {', '.join(self.VALID_MODELS)}"
+            )
+
+        super().__init__(api_key)
         self.model = model
 
         # Initialize the Mistral client
@@ -35,6 +47,14 @@ class MistralEmbedder(BaseEmbedder):
         self.logger.info(
             f"Initialized MistralEmbedder with model {self.model}"
         )
+
+    def get_config(self) -> dict:
+        """Return the configuration for this embedder.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        return {"model": self.model}
 
     # ------------------------------------------------------------------
     # Public API
@@ -99,6 +119,8 @@ class MistralEmbedder(BaseEmbedder):
             )
 
         return EmbeddingResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
             processed_at=datetime.now(timezone.utc),
             chunks_with_embeddings=embedded_chunks,
             model_name=self.model,
@@ -122,6 +144,8 @@ class MistralEmbedder(BaseEmbedder):
             )
 
         return EmbeddingResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
             processed_at=None,
             chunks_with_embeddings=empty_embeds,
             model_name=self.model,

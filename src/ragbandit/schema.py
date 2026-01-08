@@ -88,6 +88,8 @@ class OCRUsageInfo(BaseModel):
 
 class OCRResult(BaseModel):
     """Represents the output of the OCR process."""
+    component_name: str
+    component_config: dict
     source_file_path: str
     processed_at: datetime
     model: str
@@ -116,7 +118,8 @@ class RefiningTraceItem(BaseModel):
 
 class RefiningResult(BaseModel):
     """Represents the output of the refiners."""
-    refiner_name: str
+    component_name: str
+    component_config: dict
     processed_at: datetime
     pages: list[RefinedPage]  # The text content, now structured per page
     refining_trace: list[RefiningTraceItem]
@@ -146,6 +149,8 @@ class Chunk(BaseModel):
 
 class ChunkingResult(BaseModel):
     """Represents the output of the chunking process."""
+    component_name: str
+    component_config: dict
     processed_at: datetime
     chunks: list[Chunk]
     metrics: TokenUsageMetrics | None = None  # If chunker uses an LLM
@@ -164,6 +169,8 @@ class ChunkWithEmbedding(Chunk):
 
 class EmbeddingResult(BaseModel):
     """Represents the output of the embedding process."""
+    component_name: str
+    component_config: dict
     processed_at: datetime | None = None
     chunks_with_embeddings: list[ChunkWithEmbedding]
     model_name: str

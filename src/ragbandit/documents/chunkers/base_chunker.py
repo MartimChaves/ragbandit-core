@@ -21,21 +21,9 @@ class BaseChunker(ABC):
     provide specific chunking logic.
     """
 
-    def __init__(self, name: str | None = None, api_key: str | None = None):
-        """
-        Initialize the chunker.
-
-        Args:
-            name: Optional name for the chunker
-            api_key: API key for LLM services
-        """
-        # Hierarchical names make it easy to filter later:
-        #   chunker.semantic, chunker.fixed_size, etc.
-        base = "chunker"
-        self.logger = logging.getLogger(
-            f"{base}.{name or self.__class__.__name__}"
-        )
-        self.api_key = api_key
+    def __init__(self):
+        """Initialize the chunker."""
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
     def chunk(
@@ -49,13 +37,31 @@ class BaseChunker(ABC):
         Args:
             document: The RefiningResult containing
                       document content to chunk
-            usage_tracker: Optional tracker for token usage during chunking
+            usage_tracker: Optional tracker for token usage
 
         Returns:
-            A `ChunkingResult` containing a list of `Chunk` objects and
-            optional metrics.
+            A ChunkingResult containing the chunks
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def get_config(self) -> dict:
+        """Return the configuration for this chunker.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        raise NotImplementedError(
+            "Subclasses must implement get_config method"
+        )
+
+    def get_name(self) -> str:
+        """Return the component name.
+
+        Returns:
+            str: The class name of this component
+        """
+        return self.__class__.__name__
 
     def merge_small_chunks(
         self, chunks: list[Chunk], min_size: int

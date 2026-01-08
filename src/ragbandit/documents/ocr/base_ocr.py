@@ -126,6 +126,25 @@ class BaseOCR(ABC):
         """
         raise NotImplementedError("Subclasses must implement process method")
 
+    @abstractmethod
+    def get_config(self) -> dict:
+        """Return the configuration for this OCR component.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        raise NotImplementedError(
+            "Subclasses must implement get_config method"
+        )
+
+    def get_name(self) -> str:
+        """Return the component name.
+
+        Returns:
+            str: The class name of this component
+        """
+        return self.__class__.__name__
+
     # ----------------------------------------------------------------------
     def __str__(self) -> str:
         """Return a string representation of the OCR processor."""

@@ -11,21 +11,9 @@ class BaseRefiner(ABC):
     Subclasses override `process()` and, optionally, `extend_response()`.
     """
 
-    def __init__(self, name: str | None = None, api_key: str | None = None):
-        """
-        Initialize the refiner.
-
-        Args:
-            name: Optional name for the refiner
-            api_key: API key for LLM services
-        """
-        # Hierarchical names make it easy to filter later:
-        #   pipeline.text_cleaner, pipeline.language_model, …
-        base = "pipeline"
-        self.logger = logging.getLogger(
-            f"{base}.{name or self.__class__.__name__}"
-        )
-        self.api_key = api_key
+    def __init__(self):
+        """Initialize the refiner."""
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
     def process(
@@ -45,6 +33,25 @@ class BaseRefiner(ABC):
             usage_tracker: Optional token usage tracker
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def get_config(self) -> dict:
+        """Return the configuration for this refiner.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        raise NotImplementedError(
+            "Subclasses must implement get_config method"
+        )
+
+    def get_name(self) -> str:
+        """Return the component name.
+
+        Returns:
+            str: The class name of this component
+        """
+        return self.__class__.__name__
 
     # ----------------------------------------------------------------------
     def __str__(self) -> str:
@@ -79,7 +86,8 @@ class BaseRefiner(ABC):
         ]
 
         return RefiningResult(
-            refiner_name=refiner_name,
+            component_name=refiner_name,
+            component_config={},
             processed_at=datetime.now(timezone.utc),
             pages=pages_refined,
             refining_trace=[],

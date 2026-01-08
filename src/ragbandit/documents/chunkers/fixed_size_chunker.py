@@ -20,7 +20,6 @@ class FixedSizeChunker(BaseChunker):
         self,
         chunk_size: int = 1000,
         overlap: int = 200,
-        name: str | None = None,
     ):
         """
         Initialize the fixed size chunker.
@@ -28,11 +27,21 @@ class FixedSizeChunker(BaseChunker):
         Args:
             chunk_size: Target size for each chunk in characters
             overlap: Number of characters to overlap between chunks
-            name: Optional name for the chunker
         """
-        super().__init__(name)
+        super().__init__()
         self.chunk_size = chunk_size
         self.overlap = overlap
+
+    def get_config(self) -> dict:
+        """Return the configuration for this chunker.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        return {
+            "chunk_size": self.chunk_size,
+            "overlap": self.overlap,
+        }
 
     def chunk(
         self,
@@ -62,6 +71,8 @@ class FixedSizeChunker(BaseChunker):
 
         # 4. Wrap in ChunkingResult
         return ChunkingResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
             processed_at=datetime.now(timezone.utc),
             chunks=chunks,
             metrics=None,

@@ -27,21 +27,30 @@ class SemanticChunker(BaseChunker):
 
     def __init__(
         self,
+        api_key: str,
         min_chunk_size: int = 500,
-        name: str | None = None,
-        api_key: str | None = None
     ):
         """
         Initialize the semantic chunker.
 
         Args:
+            api_key: Mistral API Key
             min_chunk_size: Minimum size for chunks
                             (smaller chunks will be merged)
-            name: Optional name for the chunker
-            api_key: Mistral API Key
         """
-        super().__init__(name, api_key)
+        super().__init__()
+        self.api_key = api_key
         self.min_chunk_size = min_chunk_size
+
+    def get_config(self) -> dict:
+        """Return the configuration for this chunker.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        return {
+            "min_chunk_size": self.min_chunk_size,
+        }
 
     def semantic_chunk_pages(
         self, pages: list, usage_tracker: TokenUsageTracker | None = None
@@ -171,6 +180,8 @@ class SemanticChunker(BaseChunker):
         chunks = self.process_chunks(chunks)
 
         return ChunkingResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
             processed_at=datetime.now(timezone.utc),
             chunks=chunks,
             metrics=usage_tracker.get_summary() if usage_tracker else None,

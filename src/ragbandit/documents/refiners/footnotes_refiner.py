@@ -9,8 +9,10 @@ references or explanations, and processes them accordingly:
 """
 
 from difflib import SequenceMatcher
+from datetime import datetime, timezone
 
 from ragbandit.documents.refiners.base_refiner import BaseRefiner
+from ragbandit.schema import OCRResult, RefiningResult
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
 from ragbandit.prompt_tools.footnotes_refiner_tools import (
@@ -19,10 +21,6 @@ from ragbandit.prompt_tools.footnotes_refiner_tools import (
     detect_footnote_start_tool,
     classify_footnote_tool,
     replace_footnote_inline_operation
-)
-from ragbandit.schema import (
-    OCRResult,
-    RefiningResult,
 )
 
 
@@ -36,14 +34,25 @@ class FootnoteRefiner(BaseRefiner):
     4. Collects citation footnotes for inclusion in references
     5. Returns the modified document and the extracted footnote references
     """
-    def __init__(self, name: str | None = None, api_key: str | None = None):
+    def __init__(self, api_key: str):
         """Initialize the footnote refiner.
 
         Args:
-            name: Optional name for the refiner
             api_key: API key for LLM services
         """
-        super().__init__(name, api_key)
+        super().__init__()
+        self.api_key = api_key
+
+    def get_config(self) -> dict:
+        """Return the configuration for this refiner.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        return {
+            "inline_explanations": True,
+            "collect_citations": True,
+        }
 
     def process(
         self,
@@ -71,13 +80,20 @@ class FootnoteRefiner(BaseRefiner):
         )
 
         # Embed footnote references into extracted_data for downstream use
+        extracted_data = ref_result.extracted_data or {}
         if footnote_refs:
-            if ref_result.extracted_data is None:
-                ref_result.extracted_data = {}
+            extracted_data["footnote_refs"] = footnote_refs
 
-            ref_result.extracted_data["footnote_refs"] = footnote_refs
-
-        return ref_result
+        # Create new RefiningResult with proper component metadata
+        return RefiningResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
+            processed_at=datetime.now(timezone.utc),
+            pages=ref_result.pages,
+            refining_trace=ref_result.refining_trace,
+            extracted_data=extracted_data,
+            metrics=usage_tracker.get_summary() if usage_tracker else None,
+        )
 
     def process_footnotes(
         self,

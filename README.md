@@ -37,8 +37,8 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 file_path = "./data/raw/[document_name].pdf"
 
 doc_pipeline = DocumentPipeline(
-    chunker=SemanticChunker(min_chunk_size=500, api_key=MISTRAL_API_KEY),
-    embedder=MistralEmbedder(model="mistral-embed", api_key=MISTRAL_API_KEY),  # noqa
+    chunker=SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500),
+    embedder=MistralEmbedder(api_key=MISTRAL_API_KEY, model="mistral-embed"),
     ocr_processor=MistralOCRDocument(api_key=MISTRAL_API_KEY),
     refiners=[
         ReferencesRefiner(api_key=MISTRAL_API_KEY),
@@ -73,8 +73,8 @@ file_path = "./data/raw/[document_name].pdf"
 pipeline = DocumentPipeline(
     ocr_processor=MistralOCRDocument(api_key=MISTRAL_API_KEY),
     refiners=[ReferencesRefiner(api_key=MISTRAL_API_KEY)],
-    chunker=SemanticChunker(min_chunk_size=500, api_key=MISTRAL_API_KEY),
-    embedder=MistralEmbedder(model="mistral-embed", api_key=MISTRAL_API_KEY),
+    chunker=SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500),
+    embedder=MistralEmbedder(api_key=MISTRAL_API_KEY, model="mistral-embed"),
 )
 
 # Step 1: Run OCR
@@ -102,7 +102,7 @@ ocr_result = ocr_pipeline.run_ocr(file_path)
 
 # Later, chunk with a different pipeline
 chunk_pipeline = DocumentPipeline(
-    chunker=SemanticChunker(min_chunk_size=500, api_key=MISTRAL_API_KEY)
+    chunker=SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500)
 )
 chunks = chunk_pipeline.run_chunker(ocr_result)
 ```
