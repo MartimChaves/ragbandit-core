@@ -9,10 +9,12 @@ import pytest
 from ragbandit.schema import (
     OCRResult,
     OCRPage,
+    OCRUsageInfo,
     PageDimensions,
     RefiningResult,
     ChunkingResult,
     Chunk,
+    ChunkMetadata,
     EmbeddingResult,
     ChunkWithEmbedding,
 )
@@ -24,14 +26,15 @@ class TestPageDimensions:
 
     def test_create_page_dimensions(self):
         """Test creating a PageDimensions object."""
-        dims = PageDimensions(width=612.0, height=792.0)
-        assert dims.width == 612.0
-        assert dims.height == 792.0
+        dims = PageDimensions(dpi=72, width=612, height=792)
+        assert dims.width == 612
+        assert dims.height == 792
+        assert dims.dpi == 72
 
     def test_page_dimensions_validation(self):
         """Test that PageDimensions validates numeric types."""
         with pytest.raises(Exception):  # Pydantic validation error
-            PageDimensions(width="invalid", height=792.0)
+            PageDimensions(dpi=72, width="invalid", height=792)
 
 
 @pytest.mark.unit
@@ -44,12 +47,12 @@ class TestOCRPage:
             index=0,
             markdown="# Test Page",
             images=[],
-            dimensions=PageDimensions(width=612.0, height=792.0)
+            dimensions=PageDimensions(dpi=72, width=612, height=792)
         )
         assert page.index == 0
         assert page.markdown == "# Test Page"
         assert len(page.images) == 0
-        assert page.dimensions.width == 612.0
+        assert page.dimensions.width == 612
 
     def test_ocr_page_serialization(self):
         """Test OCRPage can be serialized to dict."""
@@ -57,7 +60,7 @@ class TestOCRPage:
             index=0,
             markdown="# Test",
             images=[],
-            dimensions=PageDimensions(width=612.0, height=792.0)
+            dimensions=PageDimensions(dpi=72, width=612, height=792)
         )
         page_dict = page.model_dump()
         assert page_dict["index"] == 0
@@ -77,6 +80,7 @@ class TestOCRResult:
             processed_at=sample_timestamp,
             model="mistral-ocr-2512",
             pages=[],
+            usage_info=OCRUsageInfo(pages_processed=0, doc_size_bytes=0),
         )
         assert result.component_name == "MistralOCRDocument"
         assert result.component_config["model"] == "mistral-ocr-2512"
@@ -90,7 +94,7 @@ class TestOCRResult:
                 index=i,
                 markdown=f"# Page {i}",
                 images=[],
-                dimensions=PageDimensions(width=612.0, height=792.0)
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
             )
             for i in range(3)
         ]
@@ -101,6 +105,7 @@ class TestOCRResult:
             processed_at=sample_timestamp,
             model="mistral-ocr-2512",
             pages=pages,
+            usage_info=OCRUsageInfo(pages_processed=3, doc_size_bytes=1024),
         )
         assert len(result.pages) == 3
         assert result.pages[1].index == 1
@@ -123,6 +128,7 @@ class TestRefiningResult:
         assert result.component_name == "FootnoteRefiner"
         assert result.component_config["inline_explanations"] is True
         assert len(result.pages) == 0
+        assert isinstance(result.refining_trace, list)
 
     def test_refining_result_with_extracted_data(self, sample_timestamp):
         """Test RefiningResult with extracted data."""
@@ -149,10 +155,10 @@ class TestChunk:
         """Test creating a Chunk object."""
         chunk = Chunk(
             text="This is a chunk of text.",
-            metadata={"page_index": 0, "chunk_index": 0}
+            metadata=ChunkMetadata(page_index=0)
         )
         assert chunk.text == "This is a chunk of text."
-        assert chunk.metadata["page_index"] == 0
+        assert chunk.metadata.page_index == 0
 
 
 @pytest.mark.unit
@@ -162,7 +168,10 @@ class TestChunkingResult:
     def test_create_chunking_result(self, sample_timestamp):
         """Test creating a ChunkingResult object."""
         chunks = [
-            Chunk(text=f"Chunk {i}", metadata={"chunk_index": i})
+            Chunk(
+                text=f"Chunk {i}",
+                metadata=ChunkMetadata(page_index=0)
+            )
             for i in range(3)
         ]
         result = ChunkingResult(
@@ -184,7 +193,7 @@ class TestChunkWithEmbedding:
         """Test creating a ChunkWithEmbedding object."""
         chunk = ChunkWithEmbedding(
             text="Sample text",
-            metadata={"chunk_index": 0},
+            metadata=ChunkMetadata(page_index=0),
             embedding=[0.1, 0.2, 0.3],
             embedding_model="mistral-embed"
         )
@@ -202,7 +211,7 @@ class TestEmbeddingResult:
         chunks = [
             ChunkWithEmbedding(
                 text=f"Chunk {i}",
-                metadata={"chunk_index": i},
+                metadata=ChunkMetadata(page_index=0),
                 embedding=[0.1 * i, 0.2 * i, 0.3 * i],
                 embedding_model="mistral-embed"
             )

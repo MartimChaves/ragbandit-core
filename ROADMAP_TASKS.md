@@ -110,24 +110,29 @@ This document outlines the tasks needed to standardize and improve the ragbandit
 - [x] Add mock API key utilities for testing
 - [x] Create first test file (test_schema.py with comprehensive schema tests)
 
-### Task 3.2: Add Unit Tests for Schema
-- [ ] Test `OCRResult` with `component_name` and `component_config`
-- [ ] Test `ProcessingResult` with `component_name` and `component_config`
-- [ ] Test `ChunkingResult` with `component_name` and `component_config`
-- [ ] Test `EmbeddingResult` with `component_name` and `component_config`
-- [ ] Test schema serialization/deserialization
+### Task 3.2: Add Unit Tests for Schema ✅ COMPLETE
+- [x] Test `OCRResult` with `component_name` and `component_config`
+- [x] Test `RefiningResult` with `component_name` and `component_config`
+- [x] Test `ChunkingResult` with `component_name` and `component_config`
+- [x] Test `EmbeddingResult` with `component_name` and `component_config`
+- [x] Test schema serialization/deserialization
 
-### Task 3.3: Add Unit Tests for Components
-- [ ] Test `get_config()` methods for all OCR implementations
-- [ ] Test `get_config()` methods for all processor implementations
-- [ ] Test `get_config()` methods for all chunker implementations
-- [ ] Test `get_config()` methods for all embedder implementations
-- [ ] Test configuration validation logic
+### Task 3.3: Add Integration Tests for Components ✅ COMPLETE
+- [x] Test MistralOCRDocument with real API calls (7 tests)
+- [x] Test FootnoteRefiner with real API calls (5 tests)
+- [x] Test ReferencesRefiner with real API calls (5 tests)
+- [x] Test FixedSizeChunker with real data (6 tests)
+- [x] Test SemanticChunker with real data (5 tests)
+- [x] Test MistralEmbedder with real API calls (12 tests)
+- [x] Test `get_config()` and `get_name()` methods for all components
+- [x] Test configuration validation (model validation)
+- [x] Test refiner chaining
+- [x] Test chunker comparison
+- [x] Created comprehensive test README with cost estimates
 
-### Task 3.4: Add Integration Tests
-- [ ] Test full pipeline with configuration tracking
+### Task 3.4: Add Integration Tests for Pipeline
+- [ ] Test full DocumentPipeline with configuration tracking
 - [ ] Test pipeline result serialization
-- [ ] Test pipeline reconstruction from configuration
 - [ ] Test error handling across pipeline stages
 
 ### Task 3.5: Update Documentation
