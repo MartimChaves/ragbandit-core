@@ -80,8 +80,16 @@ class DocumentPipeline:
         # Set up logging with more explicit configuration
         self.logger = logger or logging.getLogger(__name__)
 
+        # Ensure the pipeline logger itself is set to INFO level
+        self.logger.setLevel(logging.INFO)
+
         self._transcript = InMemoryLogHandler(level=logging.DEBUG)
         root_logger = logging.getLogger()
+
+        # Ensure root logger level allows INFO messages through
+        if root_logger.level > logging.INFO or root_logger.level == 0:
+            root_logger.setLevel(logging.INFO)
+
         root_logger.addHandler(self._transcript)
 
         # Ensure we're generating logs
@@ -257,6 +265,9 @@ class DocumentPipeline:
                 "embedder is required for full pipeline execution"
             )
 
+        self.logger.info(
+            f"Starting full pipeline processing for: {pdf_filepath}"
+        )
         start_total = time.perf_counter()
         dpr = DocumentPipelineResult(
             source_file_path=pdf_filepath,

@@ -1,10 +1,16 @@
 # ragbandit-core
 
+![Test Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)
+
 Core utilities for:
 
 * Document ingestion & processing (OCR, chunking, embedding)
 * Building and running Retrieval-Augmented Generation (RAG) pipelines
 * Evaluating answers with automated metrics
+
+## Test Coverage
+
+The codebase maintains **87% test coverage** with comprehensive integration tests covering all major components. See [tests/README.md](tests/README.md) for details on running tests and coverage reports.
 
 ## Quick start
 

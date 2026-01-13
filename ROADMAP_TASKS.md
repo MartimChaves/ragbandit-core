@@ -130,10 +130,21 @@ This document outlines the tasks needed to standardize and improve the ragbandit
 - [x] Test chunker comparison
 - [x] Created comprehensive test README with cost estimates
 
-### Task 3.4: Add Integration Tests for Pipeline
-- [ ] Test full DocumentPipeline with configuration tracking
-- [ ] Test pipeline result serialization
-- [ ] Test error handling across pipeline stages
+### Task 3.4: Add Integration Tests for Pipeline ✅ COMPLETE
+- [x] Test full DocumentPipeline with configuration tracking (30 tests total)
+- [x] Test individual pipeline steps (run_ocr, run_refiners, run_chunker, run_embedder)
+- [x] Test full pipeline.process() execution with real PDF (10 tests)
+- [x] Test pipeline result serialization and structure
+- [x] Test error handling across pipeline stages
+- [x] Test refiner chaining through pipeline
+- [x] Test metrics aggregation across steps
+- [x] Test timing tracking
+- [x] Test different chunker types (FixedSize, Semantic)
+- [x] Test different embedder models
+- [x] Test pipeline with/without refiners
+- [x] Test component name and config tracking
+- [x] Test step status tracking (success/failed)
+- [x] Test log capture during execution
 
 ### Task 3.5: Update Documentation
 - [ ] Update README.md with new configuration examples

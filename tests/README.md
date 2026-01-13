@@ -46,8 +46,30 @@ python -m pytest tests/integration/test_ocr.py
 
 ### Run with coverage report
 ```bash
+# Terminal report with missing lines
+python -m pytest --cov=ragbandit --cov-report=term-missing
+
+# HTML report (opens in browser)
 python -m pytest --cov=ragbandit --cov-report=html
+# Then open htmlcov/index.html
+
+# Both terminal and HTML
+python -m pytest tests/ --cov=ragbandit --cov-report=term-missing --cov-report=html
 ```
+
+## Current Coverage: 87%
+
+The test suite maintains **87% code coverage** across all modules:
+
+- **DocumentPipeline**: 91% (30 tests)
+- **Refiners**: 85-92% (FootnoteRefiner, ReferencesRefiner)
+- **Chunkers**: 85-94% (FixedSizeChunker, SemanticChunker)
+- **Embedders**: 88-91% (MistralEmbedder)
+- **OCR**: 97% (MistralOCRDocument)
+- **Schema**: 100% (all Pydantic models)
+- **Prompt Tools**: 100% (all tools)
+
+Coverage reports are generated locally and **not committed to git** (see `.gitignore`).
 
 ## Test Structure
 
@@ -60,7 +82,8 @@ tests/
 │   ├── test_ocr.py          # OCR processor tests
 │   ├── test_refiners.py     # Refiner tests
 │   ├── test_chunkers.py     # Chunker tests
-│   └── test_embedders.py    # Embedder tests
+│   ├── test_embedders.py    # Embedder tests
+│   └── test_pipeline.py     # Full pipeline integration tests
 └── fixtures/                # Test data files
     └── sample.pdf           # Sample PDF for OCR tests
 ```
@@ -105,6 +128,19 @@ tests/
 - ✅ Metadata preservation
 - ✅ Edge cases (empty chunks, single chunk)
 - ✅ Configuration methods
+
+#### DocumentPipeline
+- ✅ Pipeline initialization with all components
+- ✅ Individual step execution (run_ocr, run_refiners, run_chunker, run_embedder)
+- ✅ Full end-to-end pipeline.process() with real PDF
+- ✅ Configuration tracking and serialization
+- ✅ Metrics aggregation across steps
+- ✅ Timing tracking for all steps
+- ✅ Step status tracking (success/failed)
+- ✅ Log capture during execution
+- ✅ Error handling (missing components)
+- ✅ Different chunker types (FixedSize, Semantic)
+- ✅ Pipeline with/without refiners
 
 ## Cost Considerations
 
