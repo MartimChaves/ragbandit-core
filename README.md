@@ -97,20 +97,24 @@ chunk_result = pipeline.run_chunker(final_doc)
 embedding_result = pipeline.run_embedder(chunk_result)
 ```
 
-You can also create separate pipelines for different steps:
+You can also use components independently without a pipeline:
 
 ```python
-# OCR-only pipeline
-ocr_pipeline = DocumentPipeline(
-    ocr_processor=MistralOCRDocument(api_key=MISTRAL_API_KEY)
-)
-ocr_result = ocr_pipeline.run_ocr(file_path)
+# Run OCR directly
+ocr = MistralOCRDocument(api_key=MISTRAL_API_KEY)
+ocr_result = ocr.process(file_path)
 
-# Later, chunk with a different pipeline
-chunk_pipeline = DocumentPipeline(
-    chunker=SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500)
-)
-chunks = chunk_pipeline.run_chunker(ocr_result)
+# Run refiners directly
+refiner = FootnoteRefiner(api_key=MISTRAL_API_KEY)
+refined_result = refiner.process(ocr_result)
+
+# Run chunker directly
+chunker = SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500)
+chunk_result = chunker.chunk(refined_result)
+
+# Run embedder directly
+embedder = MistralEmbedder(api_key=MISTRAL_API_KEY)
+embedding_result = embedder.embed_chunks(chunk_result)
 ```
 
 ## Package layout
