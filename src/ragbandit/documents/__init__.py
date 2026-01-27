@@ -26,13 +26,15 @@ from ragbandit.documents.refiners import (
 # Import from embedders
 from ragbandit.documents.embedders import (
     BaseEmbedder,
-    MistralEmbedder
+    MistralEmbedder,
+    OpenAIEmbedder
 )
 
 # Import from OCR
 from ragbandit.documents.ocr import (
     BaseOCR,
-    MistralOCRDocument
+    MistralOCRDocument,
+    DatalabOCR
 )
 
 # Import from utils
@@ -56,10 +58,12 @@ __all__ = [
     # Embedders
     "BaseEmbedder",
     "MistralEmbedder",
+    "OpenAIEmbedder",
 
     # OCR
     "BaseOCR",
     "MistralOCRDocument",
+    "DatalabOCR",
 
     # Utils
     "SecureFileHandler"

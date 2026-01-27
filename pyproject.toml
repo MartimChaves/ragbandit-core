@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ragbandit-core"
-version = "0.1.1"
+version = "0.1.2"
 description = "Core utilities for document processing, RAG configuration, querying, and evaluation."
 authors = [
     { name="Martim Chaves", email="martim@ragbandit.com" }
@@ -26,6 +26,7 @@ dependencies = [
     "ragas>=0.3.0",
     "cryptography>=44.0.2",
     "datalab-python-sdk>=0.2.1",
+    "openai>=1.0.0",
 ]
 
 [tool.uv]

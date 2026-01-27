@@ -53,6 +53,41 @@ doc_pipeline = DocumentPipeline(
 )
 
 extended_response = doc_pipeline.process(file_path)
+```
+
+### Using Alternative OCR and Embedding Providers
+
+The package supports multiple OCR and embedding providers:
+
+```python
+from ragbandit.documents import (
+    DocumentPipeline,
+    DatalabOCR,
+    OpenAIEmbedder,
+    FixedSizeChunker
+)
+import os
+
+DATALAB_API_KEY = os.getenv("DATALAB_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+file_path = "./data/raw/[document_name].pdf"
+
+# Using Datalab OCR and OpenAI embeddings
+doc_pipeline = DocumentPipeline(
+    ocr_processor=DatalabOCR(
+        api_key=DATALAB_API_KEY,
+        model="marker",
+        mode="balanced"  # Options: fast, balanced, accurate
+    ),
+    chunker=FixedSizeChunker(chunk_size=500, overlap=100),
+    embedder=OpenAIEmbedder(
+        api_key=OPENAI_API_KEY,
+        model="text-embedding-3-small"  # or text-embedding-3-large
+    ),
+)
+
+result = doc_pipeline.process(file_path)
 
 ```
 
@@ -100,9 +135,18 @@ embedding_result = pipeline.run_embedder(chunk_result)
 You can also use components independently without a pipeline:
 
 ```python
-# Run OCR directly
+# Run OCR directly - Mistral
 ocr = MistralOCRDocument(api_key=MISTRAL_API_KEY)
 ocr_result = ocr.process(file_path)
+
+# Or use Datalab OCR
+from ragbandit.documents import DatalabOCR
+datalab_ocr = DatalabOCR(
+    api_key=DATALAB_API_KEY,
+    mode="accurate",
+    max_pages=10  # Optional: limit pages processed
+)
+ocr_result = datalab_ocr.process(file_path)
 
 # Run refiners directly
 refiner = FootnoteRefiner(api_key=MISTRAL_API_KEY)
@@ -112,9 +156,17 @@ refined_result = refiner.process(ocr_result)
 chunker = SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500)
 chunk_result = chunker.chunk(refined_result)
 
-# Run embedder directly
+# Run embedder directly - Mistral
 embedder = MistralEmbedder(api_key=MISTRAL_API_KEY)
 embedding_result = embedder.embed_chunks(chunk_result)
+
+# Or use OpenAI embeddings
+from ragbandit.documents import OpenAIEmbedder
+openai_embedder = OpenAIEmbedder(
+    api_key=OPENAI_API_KEY,
+    model="text-embedding-3-large"  # Higher quality, larger dimensions
+)
+embedding_result = openai_embedder.embed_chunks(chunk_result)
 ```
 
 ## Package layout

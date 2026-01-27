@@ -7,8 +7,10 @@ into vector embeddings for semantic search and similarity comparison.
 
 from ragbandit.documents.embedders.base_embedder import BaseEmbedder
 from ragbandit.documents.embedders.mistral_embedder import MistralEmbedder
+from ragbandit.documents.embedders.openai_embedder import OpenAIEmbedder
 
 __all__ = [
     "BaseEmbedder",
-    "MistralEmbedder"
+    "MistralEmbedder",
+    "OpenAIEmbedder"
 ]
