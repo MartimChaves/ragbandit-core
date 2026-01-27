@@ -284,7 +284,7 @@ class DatalabOCR(BaseOCR):
         if api_result.cost_breakdown:
             cost_data = api_result.cost_breakdown
             if isinstance(cost_data, dict):
-                total_cost = cost_data.get("final_cost_cents", 0.0)
+                total_cost = cost_data.get("final_cost_cents", 0.0) / 100
 
         cost_per_page = total_cost / page_count if page_count > 0 else 0.0
 
