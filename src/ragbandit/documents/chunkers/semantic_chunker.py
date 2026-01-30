@@ -108,9 +108,9 @@ class SemanticChunker(BaseChunker):
                         ]
                         idx = full_text.find(current_break_lead)
 
-                if idx == -1:
-                    # If we still can't find the snippet after
-                    # trying shorter versions,
+                if idx == -1 or idx == 0:
+                    # If we can't find the snippet, or if the break is at
+                    # the very start (idx == 0 would create an empty chunk),
                     # fallback: chunk everything as is
                     meta = ChunkMetadata(page_index=i, images=[], extra={})
                     chunks.append(Chunk(text=full_text, metadata=meta))
@@ -120,7 +120,7 @@ class SemanticChunker(BaseChunker):
                     else:
                         break
                 else:
-                    # We found a break
+                    # We found a break at a valid position (idx > 0)
                     chunk_text = full_text[:idx]
                     remainder = full_text[idx:]
                     meta = ChunkMetadata(page_index=i, images=[], extra={})
