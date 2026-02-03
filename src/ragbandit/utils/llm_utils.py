@@ -155,30 +155,46 @@ def query_llm(
             current_delay *= backoff_factor
 
         except Exception as e:
-            # Handle other API errors (rate limits, server errors)
-            if "429" in str(e) or "too many requests" in str(e).lower():
-                # Rate limiting error - retry with backoff
+            error_str = str(e).lower()
+
+            # Transient errors that should be retried
+            is_rate_limit = "429" in str(e) or "too many requests" in error_str
+            is_transient = (
+                "disconnected" in error_str
+                or "connection" in error_str
+                or "timeout" in error_str
+                or "server error" in error_str
+                or "502" in str(e)
+                or "503" in str(e)
+                or "504" in str(e)
+            )
+
+            if is_rate_limit or is_transient:
                 retry_count += 1
+                error_type = (
+                    "Rate limit" if is_rate_limit else "Transient error"
+                )
 
                 if retry_count > max_retries:
                     logger.error(
-                        (
-                            f"Rate limit exceeded after {max_retries} "
-                            f"retries: {str(e)}"
-                        )
+                        f"{error_type} after {max_retries} retries: {str(e)}"
                     )
                     raise RuntimeError(
-                        f"Rate limit exceeded after {max_retries} retries"
+                        f"{error_type} after {max_retries} retries: {str(e)}"
                     )
 
                 logger.warning(
-                    f"Rate limit hit (attempt {retry_count}/{max_retries}). "
-                    f"Retrying in {current_delay} seconds..."
+                    f"{error_type} (attempt {retry_count}/{max_retries}): "
+                    f"{str(e)}. Retrying in {current_delay} seconds..."
                 )
                 time.sleep(current_delay)
-                current_delay *= (
+                # More aggressive backoff for rate limits
+                multiplier = (
                     backoff_factor * 2
-                )  # More aggressive backoff for rate limits
+                    if is_rate_limit
+                    else backoff_factor
+                )
+                current_delay *= multiplier
             else:
                 # Other API errors - don't retry
                 logger.error(f"API error: {str(e)}")
