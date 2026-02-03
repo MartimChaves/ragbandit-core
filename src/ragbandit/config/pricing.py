@@ -32,7 +32,7 @@ OCR_MODEL_COSTS = {
 }
 
 # Default OCR model to use if the specified model is not in OCR_MODEL_COSTS
-DEFAULT_OCR_MODEL = "mistral-ocr-latest"
+DEFAULT_OCR_MODEL = "mistral-ocr-2512"
 
 # Default model to use if the specified model is not in MODEL_COSTS
 DEFAULT_MODEL = "mistral-small-latest"
