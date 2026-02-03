@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ragbandit-core"
-version = "0.1.2"
+version = "0.2.0"
 description = "Core utilities for document processing, RAG configuration, querying, and evaluation."
 authors = [
     { name="Martim Chaves", email="martim@ragbandit.com" }
