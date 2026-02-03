@@ -24,11 +24,12 @@ EMBEDDING_COSTS = {
     # Add other embedding models as needed
 }
 
-# OCR model costs per page (in EUR)
+# OCR model costs per page (in USD)
 OCR_MODEL_COSTS = {
     # Format: "model_name": cost_per_page
-    "mistral-ocr-latest": 0.001,  # 1 EUR per 1000 pages
-    # Add other OCR models as needed
+    "mistral-ocr-2505": 0.001,  # $1 per 1000 pages (older model)
+    "mistral-ocr-2512": 0.002,  # $2 per 1000 pages (latest model)
+    "mistral-ocr-latest": 0.002,  # Alias for latest
 }
 
 # Default OCR model to use if the specified model is not in OCR_MODEL_COSTS
