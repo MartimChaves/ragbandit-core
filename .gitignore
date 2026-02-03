@@ -2,3 +2,10 @@ ragbandit_core.egg-info
 __pycache__
 .venv
 dist
+tests/fixtures/sample.pdf
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
