@@ -154,6 +154,24 @@ def query_llm(
             time.sleep(current_delay)
             current_delay *= backoff_factor
 
+        except json.JSONDecodeError as e:
+            # LLM returned malformed JSON - retry as this is transient
+            retry_count += 1
+            if retry_count > max_retries:
+                logger.error(
+                    f"JSON parse error after {max_retries} retries: {str(e)}"
+                )
+                raise RuntimeError(
+                    f"LLM returned invalid JSON after {max_retries} retries: "
+                    f"{str(e)}"
+                )
+            logger.warning(
+                f"JSON parse error (attempt {retry_count}/{max_retries}): "
+                f"{str(e)}. Retrying in {current_delay} seconds..."
+            )
+            time.sleep(current_delay)
+            current_delay *= backoff_factor
+
         except Exception as e:
             error_str = str(e).lower()
 
