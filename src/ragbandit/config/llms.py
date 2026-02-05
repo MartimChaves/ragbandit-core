@@ -8,6 +8,13 @@ This module defines default settings and constants for LLM interactions.
 DEFAULT_MODEL = "mistral-small-latest"
 DEFAULT_TEMPERATURE = 0.0
 
+# Model escalation chain for fallback on persistent failures
+MODEL_ESCALATION_CHAIN = [
+    "mistral-small-latest",
+    "mistral-medium-latest",
+    "mistral-large-latest"
+]
+
 # Retry settings
 DEFAULT_MAX_RETRIES = 5  # 5 retries with backoff = ~62s max wait
 DEFAULT_RETRY_DELAY = 2.0  # seconds (initial delay)
