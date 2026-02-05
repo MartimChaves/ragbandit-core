@@ -15,6 +15,9 @@ import logging
 # Configure logger
 logger = logging.getLogger(__name__)
 
+# Timeout settings (in seconds)
+DEFAULT_TIMEOUT = 120.0  # 2 minutes max per request
+
 
 class MistralClientManager:
     """
@@ -26,9 +29,10 @@ class MistralClientManager:
     create a new client for each request.
     """
 
-    def __init__(self):
+    def __init__(self, timeout: float = DEFAULT_TIMEOUT):
         """Initialize an empty client cache."""
         self._clients: dict[str, Mistral] = {}
+        self._timeout = timeout
 
     def get_mistral_client(self, api_key: str):
         """
@@ -42,7 +46,10 @@ class MistralClientManager:
         """
         if not api_key or not api_key.strip():
             raise ValueError("Mistral API key cannot be empty or None")
-        return Mistral(api_key=api_key)
+        return Mistral(
+            api_key=api_key,
+            timeout_ms=int(self._timeout * 1000),
+        )
 
     def get_client(self, api_key: str) -> Mistral:
         """
