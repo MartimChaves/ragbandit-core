@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from ragbandit.schema import (
-    ProcessingResult,
+    RefiningResult,
     Chunk,
     ChunkMetadata,
     ChunkingResult,
@@ -27,21 +27,30 @@ class SemanticChunker(BaseChunker):
 
     def __init__(
         self,
+        api_key: str,
         min_chunk_size: int = 500,
-        name: str | None = None,
-        api_key: str | None = None
     ):
         """
         Initialize the semantic chunker.
 
         Args:
+            api_key: Mistral API Key
             min_chunk_size: Minimum size for chunks
                             (smaller chunks will be merged)
-            name: Optional name for the chunker
-            api_key: Mistral API Key
         """
-        super().__init__(name, api_key)
+        super().__init__()
+        self.api_key = api_key
         self.min_chunk_size = min_chunk_size
+
+    def get_config(self) -> dict:
+        """Return the configuration for this chunker.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        return {
+            "min_chunk_size": self.min_chunk_size,
+        }
 
     def semantic_chunk_pages(
         self, pages: list, usage_tracker: TokenUsageTracker | None = None
@@ -111,7 +120,7 @@ class SemanticChunker(BaseChunker):
                     else:
                         break
                 else:
-                    # We found a break
+                    # We found a break at a valid position (idx > 0)
                     chunk_text = full_text[:idx]
                     remainder = full_text[idx:]
                     meta = ChunkMetadata(page_index=i, images=[], extra={})
@@ -142,14 +151,14 @@ class SemanticChunker(BaseChunker):
 
     def chunk(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
     ) -> ChunkingResult:
         """
         Chunk the document using semantic chunking.
 
         Args:
-            proc_result: The ProcessingResult containing
+            ref_result: The RefiningResult containing
                       document content to chunk
             usage_tracker: Tracker for token usage during chunking
 
@@ -159,18 +168,20 @@ class SemanticChunker(BaseChunker):
         self.logger.info("Starting semantic chunking")
 
         # Get the pages from the response
-        pages = proc_result.pages
+        pages = ref_result.pages
 
         # Perform semantic chunking
         chunks = self.semantic_chunk_pages(pages, usage_tracker)
 
         # Attach image data to chunks using shared helper
-        chunks = self.attach_images(chunks, proc_result)
+        chunks = self.attach_images(chunks, ref_result)
 
         # Merge small chunks if needed
         chunks = self.process_chunks(chunks)
 
         return ChunkingResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
             processed_at=datetime.now(timezone.utc),
             chunks=chunks,
             metrics=usage_tracker.get_summary() if usage_tracker else None,

@@ -20,18 +20,16 @@ class BaseEmbedder(ABC):
     generating embeddings using different models or providers.
     """
 
-    def __init__(self, name: str = None):
+    def __init__(self, api_key: str):
         """
         Initialize the document embedder.
 
         Args:
-            name: Optional name for the embedder
+            api_key: API key for embedding services
         """
-        self.name = name or self.__class__.__name__
-
-        # Set up logging
         import logging
-        self.logger = logging.getLogger(f"{self.__class__.__name__}")
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.api_key = api_key
 
     @abstractmethod
     def embed_chunks(
@@ -50,6 +48,25 @@ class BaseEmbedder(ABC):
             An EmbeddingResult containing embedded chunks
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def get_config(self) -> dict:
+        """Return the configuration for this embedder.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        raise NotImplementedError(
+            "Subclasses must implement get_config method"
+        )
+
+    def get_name(self) -> str:
+        """Return the component name.
+
+        Returns:
+            str: The class name of this component
+        """
+        return self.__class__.__name__
 
     def cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
         """
@@ -77,6 +94,10 @@ class BaseEmbedder(ABC):
         """
         return 1 - self.cosine_similarity(a, b)
 
+    def __str__(self) -> str:
+        """Return a string representation of the embedder."""
+        return self.__class__.__name__
+
     def __repr__(self) -> str:
-        """Return string representation of the embedder."""
-        return f"{self.__class__.__name__}"
+        """Return a string representation of the embedder."""
+        return f"{self.__class__.__name__}()"

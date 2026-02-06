@@ -15,21 +15,41 @@ from ragbandit.utils import mistral_client_manager
 class MistralOCRDocument(BaseOCR):
     """OCR document processor using Mistral's API."""
 
-    # Explicit model identifier used for all Mistral OCR requests
-    MODEL_NAME = "mistral-ocr-latest"
+    # Valid model names for Mistral OCR
+    VALID_MODELS = [
+        "mistral-ocr-2505",  # "mistral-ocr-2"
+        "mistral-ocr-2512",  # "mistral-ocr-3, aka mistral-ocr-latest",
+    ]
 
-    def __init__(self, api_key: str, logger: logging.Logger = None, **kwargs):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "mistral-ocr-2512",
+        logger: logging.Logger = None,
+        **kwargs
+    ):
         """
         Initialize the Mistral OCR processor.
 
         Args:
             api_key: Mistral API key
+            model: OCR model to use (must be in VALID_MODELS)
             logger: Optional logger for OCR events
             **kwargs: Additional keyword arguments
                 - encryption_key: Optional key for encrypted file operations
+
+        Raises:
+            ValueError: If model is not in VALID_MODELS
         """
+        if model not in self.VALID_MODELS:
+            raise ValueError(
+                f"Invalid model '{model}'. "
+                f"Must be one of: {', '.join(self.VALID_MODELS)}"
+            )
+
         # Pass all kwargs to the base class
         super().__init__(logger=logger, **kwargs)
+        self.model = model
         self.client = mistral_client_manager.get_client(api_key)
 
     # ----------------- Helper methods ----------------- #
@@ -48,7 +68,7 @@ class MistralOCRDocument(BaseOCR):
     def _run_ocr(self, document_url: str) -> OCRResponse:
         """Run Mistral OCR on the provided document URL."""
         return self.client.ocr.process(
-            model=self.MODEL_NAME,
+            model=self.model,
             document={"type": "document_url", "document_url": document_url},
             include_image_base64=True,
         )
@@ -92,12 +112,20 @@ class MistralOCRDocument(BaseOCR):
 
     def _build_metrics(self, pages: list[OCRPage]) -> PagesProcessedMetrics:
         """Create page-processing cost metrics."""
-        cost_per_page = OCR_MODEL_COSTS.get(self.MODEL_NAME, 0.0)
+        cost_per_page = OCR_MODEL_COSTS.get(self.model, 0.0)
         return PagesProcessedMetrics(
             pages_processed=len(pages),
             cost_per_page=cost_per_page,
             total_cost_usd=len(pages) * cost_per_page,
         )
+
+    def get_config(self) -> dict:
+        """Return the configuration for this OCR component.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        return {"model": self.model}
 
     def _build_result(
         self,
@@ -109,6 +137,8 @@ class MistralOCRDocument(BaseOCR):
     ) -> OCRResult:
         """Assemble the OCRResult object."""
         return OCRResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
             source_file_path=pdf_filepath,
             processed_at=datetime.now(),
             model=ocr_response.model,

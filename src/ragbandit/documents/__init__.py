@@ -1,8 +1,8 @@
 """
 Document processing module for handling, analyzing, and transforming documents.
 
-This package provides tools for OCR, chunking,
-embedding, and processing documents.
+This package provides tools for OCR, refining,
+chunking, embedding, and processing documents.
 """
 
 # Import key components from subdirectories
@@ -16,23 +16,25 @@ from ragbandit.documents.chunkers import (
     SemanticBreak
 )
 
-# Import from processors
-from ragbandit.documents.processors import (
-    BaseProcessor,
-    FootnoteProcessor,
-    ReferencesProcessor
+# Import from refiners
+from ragbandit.documents.refiners import (
+    BaseRefiner,
+    FootnoteRefiner,
+    ReferencesRefiner
 )
 
 # Import from embedders
 from ragbandit.documents.embedders import (
     BaseEmbedder,
-    MistralEmbedder
+    MistralEmbedder,
+    OpenAIEmbedder
 )
 
 # Import from OCR
 from ragbandit.documents.ocr import (
     BaseOCR,
-    MistralOCRDocument
+    MistralOCRDocument,
+    DatalabOCR
 )
 
 # Import from utils
@@ -48,18 +50,20 @@ __all__ = [
     "SemanticChunker",
     "SemanticBreak",
 
-    # Processors
-    "BaseProcessor",
-    "FootnoteProcessor",
-    "ReferencesProcessor",
+    # Refiners
+    "BaseRefiner",
+    "FootnoteRefiner",
+    "ReferencesRefiner",
 
     # Embedders
     "BaseEmbedder",
     "MistralEmbedder",
+    "OpenAIEmbedder",
 
     # OCR
     "BaseOCR",
     "MistralOCRDocument",
+    "DatalabOCR",
 
     # Utils
     "SecureFileHandler"

@@ -18,6 +18,7 @@ from ragbandit.config.llms import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_RETRY_DELAY,
     DEFAULT_BACKOFF_FACTOR,
+    MODEL_ESCALATION_CHAIN,
 )
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker, count_tokens
 
@@ -39,6 +40,7 @@ def query_llm(
     retry_delay: float = DEFAULT_RETRY_DELAY,
     backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
     track_usage: bool = True,
+    enable_model_escalation: bool = True,
 ) -> T:
     """
     Send a query to the LLM with standardized formatting and retry logic.
@@ -57,6 +59,7 @@ def query_llm(
         retry_delay: Initial delay between retries in seconds
         backoff_factor: Multiplier for delay on each retry attempt
         track_usage: Whether to track token usage and costs
+        enable_model_escalation: Whether to enable model escalation on failure
 
     Returns:
         Validated instance of the output_schema model
@@ -154,31 +157,94 @@ def query_llm(
             time.sleep(current_delay)
             current_delay *= backoff_factor
 
+        except json.JSONDecodeError as e:
+            # LLM returned malformed JSON - retry as this is transient
+            retry_count += 1
+            if retry_count > max_retries:
+                # Try escalating to a more capable model
+                if enable_model_escalation:
+                    try:
+                        current_idx = MODEL_ESCALATION_CHAIN.index(model)
+                        if current_idx < len(MODEL_ESCALATION_CHAIN) - 1:
+                            next_model = MODEL_ESCALATION_CHAIN[
+                                current_idx + 1
+                            ]
+                            logger.warning(
+                                f"Escalating from {model} to {next_model} "
+                                f"after {max_retries} JSON parse failures"
+                            )
+                            return query_llm(
+                                prompt=prompt,
+                                output_schema=output_schema,
+                                api_key=api_key,
+                                usage_tracker=usage_tracker,
+                                model=next_model,
+                                temperature=temperature,
+                                max_retries=max_retries,
+                                retry_delay=retry_delay,
+                                backoff_factor=backoff_factor,
+                                track_usage=track_usage,
+                                enable_model_escalation=True,
+                            )
+                    except ValueError:
+                        # Model not in escalation chain, can't escalate
+                        pass
+
+                logger.error(
+                    f"JSON parse error after {max_retries} retries: {str(e)}"
+                )
+                raise RuntimeError(
+                    f"LLM returned invalid JSON after {max_retries} retries: "
+                    f"{str(e)}"
+                )
+            logger.warning(
+                f"JSON parse error (attempt {retry_count}/{max_retries}): "
+                f"{str(e)}. Retrying in {current_delay} seconds..."
+            )
+            time.sleep(current_delay)
+            current_delay *= backoff_factor
+
         except Exception as e:
-            # Handle other API errors (rate limits, server errors)
-            if "429" in str(e) or "too many requests" in str(e).lower():
-                # Rate limiting error - retry with backoff
+            error_str = str(e).lower()
+
+            # Transient errors that should be retried
+            is_rate_limit = "429" in str(e) or "too many requests" in error_str
+            is_transient = (
+                "disconnected" in error_str
+                or "connection" in error_str
+                or "timeout" in error_str
+                or "server error" in error_str
+                or "502" in str(e)
+                or "503" in str(e)
+                or "504" in str(e)
+            )
+
+            if is_rate_limit or is_transient:
                 retry_count += 1
+                error_type = (
+                    "Rate limit" if is_rate_limit else "Transient error"
+                )
 
                 if retry_count > max_retries:
                     logger.error(
-                        (
-                            f"Rate limit exceeded after {max_retries} "
-                            f"retries: {str(e)}"
-                        )
+                        f"{error_type} after {max_retries} retries: {str(e)}"
                     )
                     raise RuntimeError(
-                        f"Rate limit exceeded after {max_retries} retries"
+                        f"{error_type} after {max_retries} retries: {str(e)}"
                     )
 
                 logger.warning(
-                    f"Rate limit hit (attempt {retry_count}/{max_retries}). "
-                    f"Retrying in {current_delay} seconds..."
+                    f"{error_type} (attempt {retry_count}/{max_retries}): "
+                    f"{str(e)}. Retrying in {current_delay} seconds..."
                 )
                 time.sleep(current_delay)
-                current_delay *= (
+                # More aggressive backoff for rate limits
+                multiplier = (
                     backoff_factor * 2
-                )  # More aggressive backoff for rate limits
+                    if is_rate_limit
+                    else backoff_factor
+                )
+                current_delay *= multiplier
             else:
                 # Other API errors - don't retry
                 logger.error(f"API error: {str(e)}")

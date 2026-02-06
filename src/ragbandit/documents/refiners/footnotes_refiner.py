@@ -1,105 +1,121 @@
 """
-Footnote processor for detecting, processing,
+Footnote refiner for detecting, processing,
 and handling footnotes in documents.
 
-This processor identifies footnotes in a document, categorizes them as either
+This refiner identifies footnotes in a document, categorizes them as either
 references or explanations, and processes them accordingly:
 - Explanation footnotes are inlined where they are referenced
 - Citation/reference footnotes are collected and returned separately
 """
 
 from difflib import SequenceMatcher
+from datetime import datetime, timezone
 
-from ragbandit.documents.processors.base_processor import BaseProcessor
+from ragbandit.documents.refiners.base_refiner import BaseRefiner
+from ragbandit.schema import OCRResult, RefiningResult
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 
-from ragbandit.prompt_tools.footnotes_processor_tools import (
+from ragbandit.prompt_tools.footnotes_refiner_tools import (
     detect_footnote_section_tool,
     FootnoteStart,
     detect_footnote_start_tool,
     classify_footnote_tool,
     replace_footnote_inline_operation
 )
-from ragbandit.schema import (
-    OCRResult,
-    ProcessingResult,
-)
 
 
-class FootnoteProcessor(BaseProcessor):
-    """Processor for detecting and handling footnotes in documents.
+class FootnoteRefiner(BaseRefiner):
+    """Refiner for detecting and handling footnotes in documents.
 
-    This processor:
+    This refiner:
     1. Detects footnote sections at the bottom of each page
     2. Processes each footnote to determine if it's a citation or explanation
     3. Inlines explanation footnotes where they are referenced
     4. Collects citation footnotes for inclusion in references
     5. Returns the modified document and the extracted footnote references
     """
-    def __init__(self, name: str | None = None, api_key: str | None = None):
-        """Initialize the references processor.
+    def __init__(self, api_key: str):
+        """Initialize the footnote refiner.
 
         Args:
-            name: Optional name for the processor
             api_key: API key for LLM services
         """
-        super().__init__(name, api_key)
+        super().__init__()
+        self.api_key = api_key
+
+    def get_config(self) -> dict:
+        """Return the configuration for this refiner.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        return {
+            "inline_explanations": True,
+            "collect_citations": True,
+        }
 
     def process(
         self,
-        document: OCRResult | ProcessingResult,
+        document: OCRResult | RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> ProcessingResult:
+    ) -> RefiningResult:
         """Process OCR pages to detect and handle footnotes.
 
         Args:
-            document: OCR response or ProcessingResult to process
+            document: OCRResult or RefiningResult to process
             usage_tracker: Token usage tracker for LLM calls
 
         Returns:
             Tuple containing:
-            - Modified ProcessingResult with footnotes processed
+            - Modified RefiningResult with footnotes processed
             - Dictionary of footnote references by page
         """
-        # Normalise input to ProcessingResult once, then delegate
-        proc_input = self.ensure_processing_result(
-                        document, processor_name=str(self)
+        # Normalise input to RefiningResult once, then delegate
+        ref_input = self.ensure_refining_result(
+                        document, refiner_name=str(self)
                     )
 
-        proc_result, footnote_refs = self.process_footnotes(
-            proc_input, usage_tracker
+        ref_result, footnote_refs = self.process_footnotes(
+            ref_input, usage_tracker
         )
 
         # Embed footnote references into extracted_data for downstream use
+        extracted_data = ref_result.extracted_data or {}
         if footnote_refs:
-            if proc_result.extracted_data is None:
-                proc_result.extracted_data = {}
+            extracted_data["footnote_refs"] = footnote_refs
 
-            proc_result.extracted_data["footnote_refs"] = footnote_refs
-
-        return proc_result
+        # Create new RefiningResult with proper component metadata
+        return RefiningResult(
+            component_name=self.get_name(),
+            component_config=self.get_config(),
+            processed_at=datetime.now(timezone.utc),
+            pages=ref_result.pages,
+            refining_trace=ref_result.refining_trace,
+            extracted_data=extracted_data,
+            metrics=usage_tracker.get_summary() if usage_tracker else None,
+        )
 
     def process_footnotes(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ProcessingResult, dict]:
+    ) -> tuple[RefiningResult, dict]:
         """Process footnotes in document pages.
 
         This method identifies footnote sections in each page, processes them,
         and handles them based on their category (explanation or citation).
 
         Args:
-            proc_result: The document to process (already a ProcessingResult)
+            ref_result: The document to refine (already a RefiningResult)
             usage_tracker: Optional tracker for token usage in LLM calls
 
         Returns:
             Tuple containing:
-            - Modified ProcessingResult with footnotes processed
+            - Modified RefiningResult with footnotes processed
             - Dictionary of footnote references by page
         """
         footnote_sections: dict[int, str] = {}
-        for page in proc_result.pages:
+        for page in ref_result.pages:
             page_footnote_section = detect_footnote_section_tool(
                 api_key=self.api_key,
                 ocr_response_page=page.markdown,
@@ -121,11 +137,11 @@ class FootnoteProcessor(BaseProcessor):
         )
 
         # Process footnotes based on their category and update document
-        proc_result, footnote_refs = self._process_footnotes_by_category(
-            proc_result, footnotes_explained, footnotes_listed, usage_tracker
+        ref_result, footnote_refs = self._process_footnotes_by_category(
+            ref_result, footnotes_explained, footnotes_listed, usage_tracker
         )
 
-        return proc_result, footnote_refs
+        return ref_result, footnote_refs
 
     def _clean_footnote_sections(self, footnote_sections: dict) -> None:
         """Clean up footnote sections by removing common junk characters.
@@ -263,15 +279,15 @@ class FootnoteProcessor(BaseProcessor):
 
     def _process_footnotes_by_category(
         self,
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
         footnotes_explained: dict,
         footnotes_listed: dict,
         usage_tracker: TokenUsageTracker | None = None,
-    ) -> tuple[ProcessingResult, dict]:
+    ) -> tuple[RefiningResult, dict]:
         """Process footnotes based on their category and update document.
 
         Args:
-            proc_result: ProcessingResult containing document pages
+            ref_result: RefiningResult containing document pages
             footnotes_explained: Dictionary mapping page index to
                                  categorized footnotes
             footnotes_listed: Dictionary mapping page index to
@@ -279,12 +295,12 @@ class FootnoteProcessor(BaseProcessor):
 
         Returns:
             Tuple containing:
-            - Modified ProcessingResult with footnotes processed
+            - Modified RefiningResult with footnotes processed
             - Dictionary of footnote references by page
         """
         footnote_refs: dict[int, list[dict]] = {}
         for page_index in footnotes_explained:
-            page_markdown = proc_result.pages[page_index].markdown
+            page_markdown = ref_result.pages[page_index].markdown
             for footnote in footnotes_explained[page_index]:
                 footnote_category = footnote.get("category", "")
                 # If footnote is a citation, add it to footnote refs
@@ -316,9 +332,9 @@ class FootnoteProcessor(BaseProcessor):
                 page_markdown = self._remove_footnotes_by_line(
                     page_markdown, footnote_as_line
                 )
-            proc_result.pages[page_index].markdown = page_markdown
+            ref_result.pages[page_index].markdown = page_markdown
 
-        return proc_result, footnote_refs
+        return ref_result, footnote_refs
 
     def _remove_footnotes_by_line(
         self, markdown: str, target_header: str, threshold=0.95

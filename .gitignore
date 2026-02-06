@@ -1,6 +1,8 @@
 ragbandit_core.egg-info
 __pycache__
 .venv
+.ruff_cache
+.pytest_cache
 dist
 tests/fixtures/sample.pdf
 

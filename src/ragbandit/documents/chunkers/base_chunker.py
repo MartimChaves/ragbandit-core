@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 # Project
 from ragbandit.schema import (
-    ProcessingResult,
+    RefiningResult,
     Chunk,
     ChunkingResult,
     Image,
@@ -21,41 +21,47 @@ class BaseChunker(ABC):
     provide specific chunking logic.
     """
 
-    def __init__(self, name: str | None = None, api_key: str | None = None):
-        """
-        Initialize the chunker.
-
-        Args:
-            name: Optional name for the chunker
-            api_key: API key for LLM services
-        """
-        # Hierarchical names make it easy to filter later:
-        #   chunker.semantic, chunker.fixed_size, etc.
-        base = "chunker"
-        self.logger = logging.getLogger(
-            f"{base}.{name or self.__class__.__name__}"
-        )
-        self.api_key = api_key
+    def __init__(self):
+        """Initialize the chunker."""
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
     def chunk(
         self,
-        document: ProcessingResult,
+        document: RefiningResult,
         usage_tracker: TokenUsageTracker | None = None,
     ) -> ChunkingResult:
         """
-        Chunk the document content from a ProcessingResult.
+        Chunk the document content from a RefiningResult.
 
         Args:
-            document: The ProcessingResult containing
+            document: The RefiningResult containing
                       document content to chunk
-            usage_tracker: Optional tracker for token usage during chunking
+            usage_tracker: Optional tracker for token usage
 
         Returns:
-            A `ChunkingResult` containing a list of `Chunk` objects and
-            optional metrics.
+            A ChunkingResult containing the chunks
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def get_config(self) -> dict:
+        """Return the configuration for this chunker.
+
+        Returns:
+            dict: Configuration dictionary
+        """
+        raise NotImplementedError(
+            "Subclasses must implement get_config method"
+        )
+
+    def get_name(self) -> str:
+        """Return the component name.
+
+        Returns:
+            str: The class name of this component
+        """
+        return self.__class__.__name__
 
     def merge_small_chunks(
         self, chunks: list[Chunk], min_size: int
@@ -159,7 +165,7 @@ class BaseChunker(ABC):
     def attach_images(
         self,
         chunks: list[Chunk],
-        proc_result: ProcessingResult,
+        ref_result: RefiningResult,
     ) -> list[Chunk]:
         """Populate each Chunk's metadata.images with inlined image data.
 
@@ -178,7 +184,7 @@ class BaseChunker(ABC):
                 continue
 
             page_idx = chunk.metadata.page_index
-            rel_images = proc_result.pages[page_idx].images or []
+            rel_images = ref_result.pages[page_idx].images or []
             chunk.metadata.images = []
 
             for img_tag in images_in_chunk:
