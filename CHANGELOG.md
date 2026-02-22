@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-22
+
+### Fixed
+- Fixed `ValidationError` not being retried in `query_llm` when LLM returns valid JSON but missing required schema fields (e.g. `reason`). Now triggers retry and model escalation like `JSONDecodeError`.
+
 ## [0.2.0] - 2026-02-03
 
 ### Added
@@ -60,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note**: Versions 0.1.0 and 0.1.1 were initial setup releases. Version 0.1.2 is the first production-ready release with comprehensive test coverage.
 
-[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/MartimChaves/ragbandit-core/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/MartimChaves/ragbandit-core/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/MartimChaves/ragbandit-core/compare/v0.1.0...v0.1.1
