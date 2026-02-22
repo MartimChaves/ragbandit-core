@@ -10,7 +10,7 @@ import time
 import logging
 import requests
 from typing import Type, TypeVar
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from ragbandit.utils.mistral_client import mistral_client_manager
 from ragbandit.config.llms import (
     DEFAULT_MODEL,
@@ -157,8 +157,9 @@ def query_llm(
             time.sleep(current_delay)
             current_delay *= backoff_factor
 
-        except json.JSONDecodeError as e:
-            # LLM returned malformed JSON - retry as this is transient
+        except (json.JSONDecodeError, ValidationError) as e:
+            # LLM returned malformed JSON or invalid schema
+            # - retry as this is transient
             retry_count += 1
             if retry_count > max_retries:
                 # Try escalating to a more capable model
