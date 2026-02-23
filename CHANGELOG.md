@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-23
+
+### Changed
+- JSON/Validation errors in `query_llm` now skip retries on the same model and escalate directly to the next model in the chain. Retrying the same model with the same prompt is unlikely to fix structural response issues.
+
 ## [0.2.1] - 2026-02-22
 
 ### Fixed
@@ -65,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note**: Versions 0.1.0 and 0.1.1 were initial setup releases. Version 0.1.2 is the first production-ready release with comprehensive test coverage.
 
-[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/MartimChaves/ragbandit-core/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/MartimChaves/ragbandit-core/compare/v0.1.1...v0.1.2
