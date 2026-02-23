@@ -159,51 +159,46 @@ def query_llm(
 
         except (json.JSONDecodeError, ValidationError) as e:
             # LLM returned malformed JSON or invalid schema
-            # - retry as this is transient
-            retry_count += 1
-            if retry_count > max_retries:
-                # Try escalating to a more capable model
-                if enable_model_escalation:
-                    try:
-                        current_idx = MODEL_ESCALATION_CHAIN.index(model)
-                        if current_idx < len(MODEL_ESCALATION_CHAIN) - 1:
-                            next_model = MODEL_ESCALATION_CHAIN[
-                                current_idx + 1
-                            ]
-                            logger.warning(
-                                f"Escalating from {model} to {next_model} "
-                                f"after {max_retries} JSON parse failures"
-                            )
-                            return query_llm(
-                                prompt=prompt,
-                                output_schema=output_schema,
-                                api_key=api_key,
-                                usage_tracker=usage_tracker,
-                                model=next_model,
-                                temperature=temperature,
-                                max_retries=max_retries,
-                                retry_delay=retry_delay,
-                                backoff_factor=backoff_factor,
-                                track_usage=track_usage,
-                                enable_model_escalation=True,
-                            )
-                    except ValueError:
-                        # Model not in escalation chain, can't escalate
-                        pass
+            # - no point retrying same model, escalate directly
+            if enable_model_escalation:
+                try:
+                    current_idx = MODEL_ESCALATION_CHAIN.index(
+                        model
+                    )
+                    if current_idx < len(MODEL_ESCALATION_CHAIN) - 1:
+                        next_model = MODEL_ESCALATION_CHAIN[
+                            current_idx + 1
+                        ]
+                        logger.warning(
+                            f"Schema/JSON error with {model}, "
+                            f"escalating to {next_model}: "
+                            f"{str(e)}"
+                        )
+                        time.sleep(retry_delay)
+                        return query_llm(
+                            prompt=prompt,
+                            output_schema=output_schema,
+                            api_key=api_key,
+                            usage_tracker=usage_tracker,
+                            model=next_model,
+                            temperature=temperature,
+                            max_retries=max_retries,
+                            retry_delay=retry_delay,
+                            backoff_factor=backoff_factor,
+                            track_usage=track_usage,
+                            enable_model_escalation=True,
+                        )
+                except ValueError:
+                    # Model not in escalation chain
+                    pass
 
-                logger.error(
-                    f"JSON parse error after {max_retries} retries: {str(e)}"
-                )
-                raise RuntimeError(
-                    f"LLM returned invalid JSON after {max_retries} retries: "
-                    f"{str(e)}"
-                )
-            logger.warning(
-                f"JSON parse error (attempt {retry_count}/{max_retries}): "
-                f"{str(e)}. Retrying in {current_delay} seconds..."
+            logger.error(
+                f"Schema/JSON error with no escalation "
+                f"available: {str(e)}"
             )
-            time.sleep(current_delay)
-            current_delay *= backoff_factor
+            raise RuntimeError(
+                f"LLM returned invalid response: {str(e)}"
+            )
 
         except Exception as e:
             error_str = str(e).lower()
