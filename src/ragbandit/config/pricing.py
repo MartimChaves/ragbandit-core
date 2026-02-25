@@ -6,12 +6,12 @@ LLM models and embedding models.
 """
 
 # Token cost rates per 1M tokens (in USD)
-# Based on Mistral AI pricing as of July 2025
+# Based on Mistral AI pricing as of February 2026
 MODEL_COSTS = {
     # Format: "model_name": (input_cost_per_1M, output_cost_per_1M)
-    "mistral-small-latest": (2.00, 6.00),
-    "mistral-medium-latest": (6.00, 18.00),
-    "mistral-large-latest": (12.00, 36.00),
+    "mistral-small-latest": (0.1, 0.3),
+    "mistral-medium-latest": (0.4, 2.00),
+    "mistral-large-latest": (0.5, 1.5),
     # Add other models as needed
 }
 
