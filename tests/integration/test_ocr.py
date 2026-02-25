@@ -8,7 +8,7 @@ Set MISTRAL_API_KEY and DATALAB_API_KEY environment variables before running.
 import pytest
 import os
 from pathlib import Path
-from ragbandit.documents.ocr.mistral_ocr import MistralOCRDocument
+from ragbandit.documents.ocr.mistral_ocr import MistralOCR
 from ragbandit.documents.ocr.datalab_ocr import DatalabOCR
 
 
@@ -41,16 +41,16 @@ def sample_pdf_path():
 
 
 @pytest.mark.integration
-class TestMistralOCRDocument:
-    """Integration tests for MistralOCRDocument with real API calls."""
+class TestMistralOCR:
+    """Integration tests for MistralOCR with real API calls."""
 
     def test_ocr_with_default_model(self, mistral_api_key, sample_pdf_path):
         """Test OCR processing with default model."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         result = ocr.process(sample_pdf_path)
 
         assert result is not None
-        assert result.component_name == "MistralOCRDocument"
+        assert result.component_name == "MistralOCR"
         assert "model" in result.component_config
         assert result.source_file_path == sample_pdf_path
         assert len(result.pages) > 0
@@ -64,13 +64,13 @@ class TestMistralOCRDocument:
 
     def test_ocr_with_specific_model(self, mistral_api_key, sample_pdf_path):
         """Test OCR processing with specific model."""
-        ocr = MistralOCRDocument(
+        ocr = MistralOCR(
             api_key=mistral_api_key,
             model="mistral-ocr-2505"
         )
         result = ocr.process(sample_pdf_path)
 
-        assert result.component_name == "MistralOCRDocument"
+        assert result.component_name == "MistralOCR"
         assert result.component_config["model"] == "mistral-ocr-2505"
         assert result.model == "mistral-ocr-2505"
         assert len(result.pages) > 0
@@ -78,14 +78,14 @@ class TestMistralOCRDocument:
     def test_ocr_invalid_model_raises_error(self, mistral_api_key):
         """Test that invalid model raises ValueError."""
         with pytest.raises(ValueError, match="Invalid model"):
-            MistralOCRDocument(
+            MistralOCR(
                 api_key=mistral_api_key,
                 model="invalid-model"
             )
 
     def test_ocr_get_config(self, mistral_api_key):
         """Test get_config returns correct configuration."""
-        ocr = MistralOCRDocument(
+        ocr = MistralOCR(
             api_key=mistral_api_key,
             model="mistral-ocr-2512"
         )
@@ -96,12 +96,12 @@ class TestMistralOCRDocument:
 
     def test_ocr_get_name(self, mistral_api_key):
         """Test get_name returns correct component name."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
-        assert ocr.get_name() == "MistralOCRDocument"
+        ocr = MistralOCR(api_key=mistral_api_key)
+        assert ocr.get_name() == "MistralOCR"
 
     def test_ocr_result_has_metrics(self, mistral_api_key, sample_pdf_path):
         """Test that OCR result includes token usage metrics."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         result = ocr.process(sample_pdf_path)
 
         assert result.metrics is not None
@@ -117,7 +117,7 @@ class TestMistralOCRDocument:
 
     def test_ocr_multiple_pages(self, mistral_api_key, sample_pdf_path):
         """Test OCR processing handles multiple pages correctly."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         result = ocr.process(sample_pdf_path)
 
         # Verify pages are indexed correctly

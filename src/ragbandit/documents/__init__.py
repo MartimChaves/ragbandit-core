@@ -33,7 +33,7 @@ from ragbandit.documents.embedders import (
 # Import from OCR
 from ragbandit.documents.ocr import (
     BaseOCR,
-    MistralOCRDocument,
+    MistralOCR,
     DatalabOCR
 )
 
@@ -62,7 +62,7 @@ __all__ = [
 
     # OCR
     "BaseOCR",
-    "MistralOCRDocument",
+    "MistralOCR",
     "DatalabOCR",
 
     # Utils

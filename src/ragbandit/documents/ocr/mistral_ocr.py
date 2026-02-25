@@ -12,7 +12,7 @@ import logging
 from ragbandit.utils import mistral_client_manager
 
 
-class MistralOCRDocument(BaseOCR):
+class MistralOCR(BaseOCR):
     """OCR document processor using Mistral's API."""
 
     # Valid model names for Mistral OCR

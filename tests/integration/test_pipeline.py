@@ -8,7 +8,7 @@ import pytest
 import os
 from datetime import datetime, timezone
 from ragbandit.documents.document_pipeline import DocumentPipeline
-from ragbandit.documents.ocr.mistral_ocr import MistralOCRDocument
+from ragbandit.documents.ocr.mistral_ocr import MistralOCR
 from ragbandit.documents.refiners.footnotes_refiner import FootnoteRefiner
 from ragbandit.documents.refiners.references_refiner import ReferencesRefiner
 from ragbandit.documents.chunkers.fixed_size_chunker import FixedSizeChunker
@@ -75,7 +75,7 @@ processing, and recommendation systems.
         )
     ]
     return OCRResult(
-        component_name="MistralOCRDocument",
+        component_name="MistralOCR",
         component_config={"model": "mistral-ocr-2512"},
         source_file_path="/test/sample.pdf",
         processed_at=datetime.now(timezone.utc),
@@ -91,7 +91,7 @@ class TestDocumentPipeline:
 
     def test_pipeline_initialization(self, mistral_api_key):
         """Test pipeline can be initialized with all components."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         refiners = [
             FootnoteRefiner(api_key=mistral_api_key),
             ReferencesRefiner(api_key=mistral_api_key),
@@ -185,7 +185,7 @@ class TestDocumentPipeline:
 
     def test_pipeline_configuration_tracking(self, mistral_api_key):
         """Test that pipeline tracks component configurations."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         refiners = [FootnoteRefiner(api_key=mistral_api_key)]
         chunker = FixedSizeChunker(chunk_size=500, overlap=100)
         embedder = MistralEmbedder(
@@ -201,7 +201,7 @@ class TestDocumentPipeline:
         )
 
         # Verify configuration is tracked
-        assert pipeline.ocr_processor.get_name() == "MistralOCRDocument"
+        assert pipeline.ocr_processor.get_name() == "MistralOCR"
         assert pipeline.refiners[0].get_name() == "FootnoteRefiner"
         assert pipeline.chunker.get_name() == "FixedSizeChunker"
         assert pipeline.embedder.get_name() == "MistralEmbedder"
@@ -353,7 +353,7 @@ class TestDocumentPipelineFullExecution:
             )
         ]
         ocr_result = OCRResult(
-            component_name="MistralOCRDocument",
+            component_name="MistralOCR",
             component_config={"model": "mistral-ocr-2512"},
             source_file_path="/test/sample.pdf",
             processed_at=datetime.now(timezone.utc),
@@ -394,7 +394,7 @@ class TestDocumentPipelineFullExecution:
 
     def test_pipeline_config_serialization(self, mistral_api_key):
         """Test that pipeline configuration is serializable."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         refiners = [
             FootnoteRefiner(api_key=mistral_api_key),
             ReferencesRefiner(api_key=mistral_api_key),
@@ -439,7 +439,7 @@ class TestDocumentPipelineFullExecution:
             )
         ]
         ocr_result = OCRResult(
-            component_name="MistralOCRDocument",
+            component_name="MistralOCR",
             component_config={"model": "mistral-ocr-2512"},
             source_file_path="/test/sample.pdf",
             processed_at=datetime.now(timezone.utc),
@@ -477,7 +477,7 @@ class TestDocumentPipelineFullExecution:
 
     def test_pipeline_component_names(self, mistral_api_key):
         """Test that all components report correct names."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         refiners = [
             FootnoteRefiner(api_key=mistral_api_key),
             ReferencesRefiner(api_key=mistral_api_key),
@@ -486,14 +486,14 @@ class TestDocumentPipelineFullExecution:
         embedder = MistralEmbedder(api_key=mistral_api_key)
 
         # Verify get_name() returns correct values
-        assert ocr.get_name() == "MistralOCRDocument"
+        assert ocr.get_name() == "MistralOCR"
         assert refiners[0].get_name() == "FootnoteRefiner"
         assert refiners[1].get_name() == "ReferencesRefiner"
         assert chunker.get_name() == "FixedSizeChunker"
         assert embedder.get_name() == "MistralEmbedder"
 
         # Verify str() returns class name
-        assert str(ocr) == "MistralOCRDocument"
+        assert str(ocr) == "MistralOCR"
         assert str(refiners[0]) == "FootnoteRefiner"
         assert str(chunker) == "FixedSizeChunker"
         assert str(embedder) == "MistralEmbedder"
@@ -509,7 +509,7 @@ class TestDocumentPipelineFullExecution:
             )
         ]
         ocr_result = OCRResult(
-            component_name="MistralOCRDocument",
+            component_name="MistralOCR",
             component_config={"model": "mistral-ocr-2512"},
             source_file_path="/test/sample.pdf",
             processed_at=datetime.now(timezone.utc),
@@ -553,7 +553,7 @@ Italian pasta is delicious.""",
             )
         ]
         ocr_result = OCRResult(
-            component_name="MistralOCRDocument",
+            component_name="MistralOCR",
             component_config={"model": "mistral-ocr-2512"},
             source_file_path="/test/sample.pdf",
             processed_at=datetime.now(timezone.utc),
@@ -619,7 +619,7 @@ class TestDocumentPipelineProcess:
     ):
         """Test full pipeline execution from PDF to embeddings."""
         # Create pipeline with all components
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         refiners = [
             FootnoteRefiner(api_key=mistral_api_key),
             ReferencesRefiner(api_key=mistral_api_key),
@@ -680,7 +680,7 @@ class TestDocumentPipelineProcess:
         self, mistral_api_key, sample_pdf_path
     ):
         """Test pipeline with minimal configuration (no refiners)."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         chunker = FixedSizeChunker(chunk_size=300, overlap=50)
         embedder = MistralEmbedder(api_key=mistral_api_key)
 
@@ -711,7 +711,7 @@ class TestDocumentPipelineProcess:
         self, mistral_api_key, sample_pdf_path
     ):
         """Test pipeline with semantic chunker."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         chunker = SemanticChunker(
             api_key=mistral_api_key,
             min_chunk_size=200
@@ -750,7 +750,7 @@ class TestDocumentPipelineProcess:
         self, mistral_api_key, sample_pdf_path
     ):
         """Test pipeline.process() raises error when chunker missing."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         embedder = MistralEmbedder(api_key=mistral_api_key)
 
         pipeline = DocumentPipeline(
@@ -768,7 +768,7 @@ class TestDocumentPipelineProcess:
         self, mistral_api_key, sample_pdf_path
     ):
         """Test pipeline.process() raises error when embedder missing."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         chunker = FixedSizeChunker(chunk_size=500, overlap=100)
 
         pipeline = DocumentPipeline(
@@ -786,7 +786,7 @@ class TestDocumentPipelineProcess:
         self, mistral_api_key, sample_pdf_path
     ):
         """Test that pipeline result can be serialized."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         chunker = FixedSizeChunker(chunk_size=500, overlap=100)
         embedder = MistralEmbedder(api_key=mistral_api_key)
 
@@ -812,7 +812,7 @@ class TestDocumentPipelineProcess:
         self, mistral_api_key, sample_pdf_path
     ):
         """Test that component configs are tracked in pipeline result."""
-        ocr = MistralOCRDocument(
+        ocr = MistralOCR(
             api_key=mistral_api_key,
             model="mistral-ocr-2512"
         )
@@ -833,7 +833,7 @@ class TestDocumentPipelineProcess:
         result = pipeline.process(sample_pdf_path)
 
         # Verify pipeline config contains component info
-        assert result.pipeline_config["ocr"] == "MistralOCRDocument"
+        assert result.pipeline_config["ocr"] == "MistralOCR"
         assert "FootnoteRefiner" in result.pipeline_config["refiners"]
         assert result.pipeline_config["chunker"] == "FixedSizeChunker"
         assert result.pipeline_config["embedder"] == "MistralEmbedder"
@@ -851,7 +851,7 @@ class TestDocumentPipelineProcess:
         self, mistral_api_key, sample_pdf_path
     ):
         """Test that pipeline captures logs during execution."""
-        ocr = MistralOCRDocument(api_key=mistral_api_key)
+        ocr = MistralOCR(api_key=mistral_api_key)
         chunker = FixedSizeChunker(chunk_size=500, overlap=100)
         embedder = MistralEmbedder(api_key=mistral_api_key)
 

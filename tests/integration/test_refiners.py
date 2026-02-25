@@ -48,7 +48,7 @@ This is a sample document with footnotes[^1] and citations[^2].
         )
     ]
     return OCRResult(
-        component_name="MistralOCRDocument",
+        component_name="MistralOCR",
         component_config={"model": "mistral-ocr-2512"},
         source_file_path="/test/sample.pdf",
         processed_at=datetime.now(timezone.utc),
