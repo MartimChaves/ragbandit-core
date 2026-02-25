@@ -65,7 +65,7 @@ The test suite maintains **87% code coverage** across all modules:
 - **Refiners**: 85-92% (FootnoteRefiner, ReferencesRefiner)
 - **Chunkers**: 85-94% (FixedSizeChunker, SemanticChunker)
 - **Embedders**: 88-91% (MistralEmbedder)
-- **OCR**: 97% (MistralOCRDocument)
+- **OCR**: 97% (MistralOCR)
 - **Schema**: 100% (all Pydantic models)
 - **Prompt Tools**: 100% (all tools)
 
@@ -97,8 +97,8 @@ tests/
 ### Integration Tests
 
 #### OCR Processors
-- ✅ MistralOCRDocument with default model
-- ✅ MistralOCRDocument with specific model
+- ✅ MistralOCR with default model
+- ✅ MistralOCR with specific model
 - ✅ Model validation
 - ✅ Configuration methods
 - ✅ Token usage metrics

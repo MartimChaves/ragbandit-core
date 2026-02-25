@@ -5,11 +5,11 @@ This module provides OCR processors that convert document images to text.
 """
 
 from ragbandit.documents.ocr.base_ocr import BaseOCR
-from ragbandit.documents.ocr.mistral_ocr import MistralOCRDocument
+from ragbandit.documents.ocr.mistral_ocr import MistralOCR
 from ragbandit.documents.ocr.datalab_ocr import DatalabOCR
 
 __all__ = [
     "BaseOCR",
-    "MistralOCRDocument",
+    "MistralOCR",
     "DatalabOCR"
 ]

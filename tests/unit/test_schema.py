@@ -74,7 +74,7 @@ class TestOCRResult:
     def test_create_ocr_result(self, sample_timestamp):
         """Test creating an OCRResult object."""
         result = OCRResult(
-            component_name="MistralOCRDocument",
+            component_name="MistralOCR",
             component_config={"model": "mistral-ocr-2512"},
             source_file_path="/path/to/file.pdf",
             processed_at=sample_timestamp,
@@ -82,7 +82,7 @@ class TestOCRResult:
             pages=[],
             usage_info=OCRUsageInfo(pages_processed=0, doc_size_bytes=0),
         )
-        assert result.component_name == "MistralOCRDocument"
+        assert result.component_name == "MistralOCR"
         assert result.component_config["model"] == "mistral-ocr-2512"
         assert result.source_file_path == "/path/to/file.pdf"
         assert len(result.pages) == 0
@@ -99,7 +99,7 @@ class TestOCRResult:
             for i in range(3)
         ]
         result = OCRResult(
-            component_name="MistralOCRDocument",
+            component_name="MistralOCR",
             component_config={"model": "mistral-ocr-2512"},
             source_file_path="/path/to/file.pdf",
             processed_at=sample_timestamp,

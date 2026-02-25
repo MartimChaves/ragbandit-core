@@ -23,7 +23,7 @@ from ragbandit.documents import (
     DocumentPipeline,
     ReferencesRefiner,
     FootnoteRefiner,
-    MistralOCRDocument,
+    MistralOCR,
     MistralEmbedder,
     SemanticChunker
 )
@@ -45,7 +45,7 @@ file_path = "./data/raw/[document_name].pdf"
 doc_pipeline = DocumentPipeline(
     chunker=SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500),
     embedder=MistralEmbedder(api_key=MISTRAL_API_KEY, model="mistral-embed"),
-    ocr_processor=MistralOCRDocument(api_key=MISTRAL_API_KEY),
+    ocr_processor=MistralOCR(api_key=MISTRAL_API_KEY),
     refiners=[
         ReferencesRefiner(api_key=MISTRAL_API_KEY),
         FootnoteRefiner(api_key=MISTRAL_API_KEY),
@@ -99,7 +99,7 @@ For more control, you can run each pipeline step independently:
 from ragbandit.documents import (
     DocumentPipeline,
     ReferencesRefiner,
-    MistralOCRDocument,
+    MistralOCR,
     MistralEmbedder,
     SemanticChunker
 )
@@ -112,7 +112,7 @@ file_path = "./data/raw/[document_name].pdf"
 
 # Create pipeline with only the components you need
 pipeline = DocumentPipeline(
-    ocr_processor=MistralOCRDocument(api_key=MISTRAL_API_KEY),
+    ocr_processor=MistralOCR(api_key=MISTRAL_API_KEY),
     refiners=[ReferencesRefiner(api_key=MISTRAL_API_KEY)],
     chunker=SemanticChunker(api_key=MISTRAL_API_KEY, min_chunk_size=500),
     embedder=MistralEmbedder(api_key=MISTRAL_API_KEY, model="mistral-embed"),
@@ -136,7 +136,7 @@ You can also use components independently without a pipeline:
 
 ```python
 # Run OCR directly - Mistral
-ocr = MistralOCRDocument(api_key=MISTRAL_API_KEY)
+ocr = MistralOCR(api_key=MISTRAL_API_KEY)
 ocr_result = ocr.process(file_path)
 
 # Or use Datalab OCR
