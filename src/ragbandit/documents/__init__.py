@@ -37,9 +37,6 @@ from ragbandit.documents.ocr import (
     DatalabOCR
 )
 
-# Import from utils
-from ragbandit.documents.utils import SecureFileHandler
-
 __all__ = [
     # Main pipeline
     "DocumentPipeline",
@@ -64,7 +61,4 @@ __all__ = [
     "BaseOCR",
     "MistralOCR",
     "DatalabOCR",
-
-    # Utils
-    "SecureFileHandler"
 ]

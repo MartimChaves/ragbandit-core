@@ -335,40 +335,27 @@ class DatalabOCR(BaseOCR):
     def process(
         self,
         pdf_filepath: str,
-        encrypted: bool = False,
     ) -> OCRResult:
         """High-level orchestration for running Datalab OCR on a PDF.
 
         Args:
             pdf_filepath: Path to the PDF file to OCR
-            encrypted: Whether the file is encrypted (default: False)
 
         Returns:
             OCRResult: The OCR result from Datalab
         """
-        file_name, reader = self.validate_and_prepare_file(
-            pdf_filepath, encrypted
+        _, reader = self.validate_and_prepare_file(
+            pdf_filepath
         )
 
-        temp_file = None
         try:
-            if encrypted:
-                temp_file = Path(pdf_filepath).parent / f"temp_{file_name}"
-                with open(temp_file, "wb") as f:
-                    f.write(reader.read())
-                file_to_process = str(temp_file)
-            else:
-                file_to_process = pdf_filepath
-
             data = self._build_request_data()
 
-            check_url = self._submit_ocr_job(file_to_process, data)
+            check_url = self._submit_ocr_job(pdf_filepath, data)
             api_result = self._poll_for_completion(
                 check_url, self.poll_interval, self.max_polls
             )
         finally:
-            if temp_file and temp_file.exists():
-                temp_file.unlink()
             del reader
 
         pages = self._convert_pages(api_result)

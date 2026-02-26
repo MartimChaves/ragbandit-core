@@ -1,9 +1,7 @@
 import logging
 import os
 from abc import ABC, abstractmethod
-from pathlib import Path
 from io import BytesIO, BufferedReader
-from ragbandit.documents.utils.secure_file_handler import SecureFileHandler
 from ragbandit.schema import OCRResult
 
 
@@ -14,15 +12,13 @@ class BaseOCR(ABC):
     must follow. Subclasses should implement the process() method.
     """
 
-    def __init__(self, logger: logging.Logger = None, **kwargs):
+    def __init__(self, logger: logging.Logger = None):
         """Initialize the OCR processor.
 
         Args:
             logger: Optional logger for OCR events
-            **kwargs: Additional keyword arguments (e.g., encryption_key)
         """
         self.logger = logger or logging.getLogger(__name__)
-        self.kwargs = kwargs
 
     def validate_pdf(self, pdf_filepath: str) -> str:
         """Validate that a PDF file exists.
@@ -45,39 +41,11 @@ class BaseOCR(ABC):
 
         return file_name
 
-    def read_encrypted_file(self, pdf_filepath: str) -> BufferedReader:
-        """Read an encrypted PDF file and return a buffered reader.
+    def read_file(self, pdf_filepath: str) -> BufferedReader:
+        """Read a PDF file and return a buffered reader.
 
         Args:
-            pdf_filepath: Path to the encrypted PDF file
-
-        Returns:
-            BufferedReader: A buffered reader for the decrypted file content
-
-        Raises:
-            ValueError: If encryption_key is not provided in kwargs
-        """
-        self.logger.info("Decrypting for OCR...")
-
-        encryption_key = self.kwargs.get("encryption_key")
-        if not encryption_key:
-            raise ValueError(
-                "encryption_key must be provided in kwargs "
-                "for encrypted file operations. "
-                "Pass encryption_key when initializing the OCR processor."
-            )
-
-        secure_handler = SecureFileHandler(encryption_key=encryption_key)
-        decrypted = secure_handler.read_encrypted_file(Path(pdf_filepath))
-        raw = BytesIO(decrypted)
-        raw.seek(0)
-        return BufferedReader(raw)
-
-    def read_unencrypted_file(self, pdf_filepath: str) -> BufferedReader:
-        """Read an unencrypted PDF file and return a buffered reader.
-
-        Args:
-            pdf_filepath: Path to the unencrypted PDF file
+            pdf_filepath: Path to the PDF file
 
         Returns:
             BufferedReader: A buffered reader for the file content
@@ -91,13 +59,12 @@ class BaseOCR(ABC):
         return BufferedReader(raw)
 
     def validate_and_prepare_file(
-        self, pdf_filepath: str, encrypted: bool = True
+        self, pdf_filepath: str
     ) -> tuple[str, BufferedReader]:
         """Validate and prepare a PDF file for OCR processing.
 
         Args:
             pdf_filepath: Path to the PDF file to OCR
-            encrypted: Whether the file is encrypted (default: True)
 
         Returns:
             tuple: (file_name, file_reader)
@@ -106,11 +73,7 @@ class BaseOCR(ABC):
             ValueError: If the file does not exist
         """
         file_name = self.validate_pdf(pdf_filepath)
-
-        if encrypted:
-            reader = self.read_encrypted_file(pdf_filepath)
-        else:
-            reader = self.read_unencrypted_file(pdf_filepath)
+        reader = self.read_file(pdf_filepath)
 
         return file_name, reader
 

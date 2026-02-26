@@ -148,11 +148,11 @@ class MistralOCR(BaseOCR):
             metrics=metrics,
         )
 
-    def process(self, pdf_filepath: str, encrypted: bool = False) -> OCRResult:
+    def process(self, pdf_filepath: str) -> OCRResult:
         """High-level orchestration for running Mistral OCR on a PDF."""
 
         file_name, reader = self.validate_and_prepare_file(
-                                pdf_filepath, encrypted
+                                pdf_filepath
                             )
 
         uploaded = self._upload_file(file_name, reader)
