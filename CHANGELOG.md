@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-02-27
+
+### Added
+- Added `tiktoken>=0.12.0` runtime dependency.
+
 ## [0.2.5] - 2026-02-26
 
 ### Removed
@@ -86,7 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note**: Versions 0.1.0 and 0.1.1 were initial setup releases. Version 0.1.2 is the first production-ready release with comprehensive test coverage.
 
-[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.2...v0.2.3
