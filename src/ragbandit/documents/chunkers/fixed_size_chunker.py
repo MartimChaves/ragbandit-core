@@ -20,6 +20,7 @@ class FixedSizeChunker(BaseChunker):
         self,
         chunk_size: int = 1000,
         overlap: int = 200,
+        max_chunk_size: int | None = None,
     ):
         """
         Initialize the fixed size chunker.
@@ -27,8 +28,10 @@ class FixedSizeChunker(BaseChunker):
         Args:
             chunk_size: Target size for each chunk in characters
             overlap: Number of characters to overlap between chunks
+            max_chunk_size: Hard upper limit on chunk size in characters.
+                Chunks exceeding this are split further. None means no limit.
         """
-        super().__init__()
+        super().__init__(max_chunk_size=max_chunk_size)
         self.chunk_size = chunk_size
         self.overlap = overlap
 
@@ -41,6 +44,7 @@ class FixedSizeChunker(BaseChunker):
         return {
             "chunk_size": self.chunk_size,
             "overlap": self.overlap,
+            "max_chunk_size": self.max_chunk_size,
         }
 
     def chunk(
@@ -63,10 +67,13 @@ class FixedSizeChunker(BaseChunker):
         # 1. Generate raw chunks for each page
         chunks = self._fixed_size_chunk_pages(ref_result)
 
-        # 2. Attach any inline images using BaseChunker helper
+        # 2. Split any oversized chunks before image attachment
+        chunks = self._split_oversized_chunks(chunks)
+
+        # 3. Attach any inline images using BaseChunker helper
         chunks = self.attach_images(chunks, ref_result)
 
-        # 3. Merge small chunks if needed
+        # 4. Merge small chunks if needed
         chunks = self.process_chunks(chunks)
 
         # 4. Wrap in ChunkingResult

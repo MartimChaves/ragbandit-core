@@ -244,11 +244,17 @@ class ReferencesRefiner(BaseRefiner):
         refs_page = -1
         next_header_page = -1
 
+        # Strip leading/trailing whitespace so headers captured from
+        # concatenated page text (which may have a leading \n) can be
+        # matched against individual page markdown strings.
+        refs_header_s = refs_header.strip()
+        next_header_s = next_header.strip() if next_header else None
+
         # Find the pages where references start and end
         for page in ref_result.pages:
-            if refs_header in page.markdown:
+            if refs_header_s in page.markdown:
                 refs_page = page.index
-            if next_header is not None and next_header in page.markdown:
+            if next_header_s is not None and next_header_s in page.markdown:
                 next_header_page = page.index
 
         # If references header wasn't found in any page, return None
@@ -257,24 +263,26 @@ class ReferencesRefiner(BaseRefiner):
 
         # Get the location (page, index) where references start
         refs_page_markdown = ref_result.pages[refs_page].markdown
-        references_start_index = refs_page_markdown.find(refs_header)
+        references_start_index = refs_page_markdown.find(refs_header_s)
         references_start = (refs_page, references_start_index)
 
         # Determine where references end
         references_end = None
-        if next_header is not None and next_header_page != -1:
+        if next_header_s is not None and next_header_page != -1:
             next_header_page_markdown = ref_result.pages[
                 next_header_page
             ].markdown
-            references_end_index = next_header_page_markdown.find(next_header)
-            if references_end_index is not None:
+            references_end_index = next_header_page_markdown.find(
+                next_header_s
+            )
+            if references_end_index != -1:
                 references_end = (next_header_page, references_end_index)
 
         return {
             "start": references_start,
             "end": references_end,
-            "refs_header": refs_header,
-            "next_header": next_header,
+            "refs_header": refs_header_s,
+            "next_header": next_header_s,
         }
 
     def _extract_references(

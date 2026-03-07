@@ -6,6 +6,11 @@ This module provides common fixtures used across unit and integration tests.
 
 import pytest
 from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load API keys from tests/.env if present (keys not required for unit tests)
+load_dotenv(Path(__file__).parent / ".env")
 
 
 @pytest.fixture

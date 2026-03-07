@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from ragbandit.schema import (
     RefiningResult,
     Chunk,
+    ChunkMetadata,
     ChunkingResult,
     Image,
 )
@@ -21,9 +22,16 @@ class BaseChunker(ABC):
     provide specific chunking logic.
     """
 
-    def __init__(self):
-        """Initialize the chunker."""
+    def __init__(self, max_chunk_size: int | None = None):
+        """Initialize the chunker.
+
+        Args:
+            max_chunk_size: Optional hard upper limit on chunk size in
+                characters. Any chunk exceeding this is split further.
+                None means no limit.
+        """
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.max_chunk_size = max_chunk_size
 
     @abstractmethod
     def chunk(
@@ -143,6 +151,52 @@ class BaseChunker(ABC):
                 i += 1
 
         return merged
+
+    def _split_oversized_chunks(
+        self, chunks: list[Chunk]
+    ) -> list[Chunk]:
+        """Split chunks that exceed max_chunk_size with a hard character split.
+
+        Called before attach_images so image markers remain in the correct
+        sub-chunk and get properly assigned when attach_images runs.
+
+        Args:
+            chunks: Chunks to check and split if necessary.
+
+        Returns:
+            New chunk list where every chunk is <= max_chunk_size chars.
+        """
+        if self.max_chunk_size is None:
+            return chunks
+
+        result: list[Chunk] = []
+        for chunk in chunks:
+            if len(chunk.text) <= self.max_chunk_size:
+                result.append(chunk)
+                continue
+
+            self.logger.warning(
+                f"Chunk on page {chunk.metadata.page_index} has "
+                f"{len(chunk.text)} chars, exceeding max_chunk_size="
+                f"{self.max_chunk_size}. Splitting."
+            )
+            text = chunk.text
+            start = 0
+            while start < len(text):
+                end = min(start + self.max_chunk_size, len(text))
+                result.append(Chunk(
+                    text=text[start:end],
+                    metadata=ChunkMetadata(
+                        page_index=chunk.metadata.page_index,
+                        images=[],
+                        extra=chunk.metadata.extra or {},
+                    ),
+                ))
+                if end >= len(text):
+                    break
+                start = end
+
+        return result
 
     def process_chunks(
         self, chunks: list[Chunk]

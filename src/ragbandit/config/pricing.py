@@ -21,7 +21,14 @@ EMBEDDING_COSTS = {
     "mistral-embed": 0.10,
     "text-embedding-3-small": 0.02,
     "text-embedding-3-large": 0.13,
-    # Add other embedding models as needed
+    # Voyage AI models (pricing as of March 2026)
+    "voyage-3-large": 0.18,
+    "voyage-3": 0.06,
+    "voyage-3-lite": 0.02,
+    # Cohere models (pricing as of March 2026)
+    "embed-v4.0": 0.12,
+    "embed-english-v3.0": 0.10,
+    "embed-multilingual-v3.0": 0.10,
 }
 
 # OCR model costs per page (in USD)

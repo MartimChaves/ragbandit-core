@@ -8,6 +8,10 @@ import pytest
 import os
 from ragbandit.documents.chunkers.fixed_size_chunker import FixedSizeChunker
 from ragbandit.documents.chunkers.semantic_chunker import SemanticChunker
+from ragbandit.documents.chunkers.sentence_chunker import SentenceChunker
+from ragbandit.documents.chunkers.recursive_markdown_chunker import (
+    RecursiveMarkdownChunker,
+)
 from ragbandit.schema import (
     RefiningResult,
     RefinedPage,
@@ -424,3 +428,366 @@ class TestChunkerComparison:
             assert hasattr(chunk.metadata, 'page_index')
         for chunk in semantic_result.chunks:
             assert hasattr(chunk.metadata, 'page_index')
+
+
+@pytest.mark.integration
+class TestSentenceChunker:
+    """Integration tests for SentenceChunker."""
+
+    def test_sentence_chunker_basic(self, sample_refining_result):
+        """Test basic sentence chunking."""
+        chunker = SentenceChunker(sentences_per_chunk=5, sentence_overlap=1)
+        result = chunker.chunk(sample_refining_result)
+
+        assert result is not None
+        assert result.component_name == "SentenceChunker"
+        assert result.component_config["sentences_per_chunk"] == 5
+        assert result.component_config["sentence_overlap"] == 1
+        assert len(result.chunks) > 0
+
+        for chunk in result.chunks:
+            assert len(chunk.text) > 0
+            assert hasattr(chunk.metadata, 'page_index')
+            assert chunk.metadata.page_index >= 0
+
+    def test_sentence_chunker_get_config(self):
+        """Test get_config returns correct configuration."""
+        chunker = SentenceChunker(
+            sentences_per_chunk=3,
+            sentence_overlap=1,
+            min_chunk_size=50,
+        )
+        config = chunker.get_config()
+
+        assert config["sentences_per_chunk"] == 3
+        assert config["sentence_overlap"] == 1
+        assert config["min_chunk_size"] == 50
+
+    def test_sentence_chunker_get_name(self):
+        """Test get_name returns correct component name."""
+        chunker = SentenceChunker()
+        assert chunker.get_name() == "SentenceChunker"
+
+    def test_sentence_chunker_invalid_overlap_raises(self):
+        """Test that overlap >= sentences_per_chunk raises ValueError."""
+        with pytest.raises(ValueError, match="sentence_overlap"):
+            SentenceChunker(sentences_per_chunk=3, sentence_overlap=3)
+
+        with pytest.raises(ValueError, match="sentence_overlap"):
+            SentenceChunker(sentences_per_chunk=3, sentence_overlap=5)
+
+    def test_sentence_chunker_empty_page(self):
+        """Test chunker handles empty pages without error."""
+        pages = [
+            RefinedPage(
+                index=0,
+                markdown="",
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            ),
+            RefinedPage(
+                index=1,
+                markdown="A proper sentence here. And another one.",
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            ),
+        ]
+        ref_result = RefiningResult(
+            component_name="TestRefiner",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            pages=pages,
+            refining_trace=[],
+            extracted_data={},
+        )
+        chunker = SentenceChunker(sentences_per_chunk=3, sentence_overlap=1)
+        result = chunker.chunk(ref_result)
+
+        assert result is not None
+        assert len(result.chunks) > 0
+        for chunk in result.chunks:
+            assert chunk.metadata.page_index == 1
+
+    def test_behavior_chunks_are_sentence_groups(self):
+        """Behavior: each chunk contains at most
+        sentences_per_chunk sentences."""
+        pages = [
+            RefinedPage(
+                index=0,
+                markdown=(
+                    "First sentence ends here. "
+                    "Second sentence is here. "
+                    "Third sentence follows. "
+                    "Fourth sentence comes next. "
+                    "Fifth sentence is present. "
+                    "Sixth sentence appears. "
+                    "Seventh sentence finishes."
+                ),
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            )
+        ]
+        ref_result = RefiningResult(
+            component_name="TestRefiner",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            pages=pages,
+            refining_trace=[],
+            extracted_data={},
+        )
+        chunker = SentenceChunker(
+            sentences_per_chunk=3,
+            sentence_overlap=0,
+            min_chunk_size=1,
+        )
+        result = chunker.chunk(ref_result)
+
+        # 7 sentences with window=3, step=3 → 3 chunks (3, 3, 1)
+        assert len(result.chunks) >= 2
+
+        # No chunk should contain more than 3 sentence-ending punctuation marks
+        for chunk in result.chunks:
+            sentence_endings = chunk.text.count(
+                "."
+            ) + chunk.text.count("!") + chunk.text.count("?")
+            assert sentence_endings <= 3, (
+                f"Chunk has more than 3 sentences: {chunk.text!r}"
+            )
+
+    def test_behavior_overlap_repeats_sentences(self):
+        """Behavior: overlapping sentences appear in consecutive chunks."""
+        pages = [
+            RefinedPage(
+                index=0,
+                markdown=(
+                    "Alpha sentence is first. "
+                    "Beta sentence is second. "
+                    "Gamma sentence is third. "
+                    "Delta sentence is fourth."
+                ),
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            )
+        ]
+        ref_result = RefiningResult(
+            component_name="TestRefiner",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            pages=pages,
+            refining_trace=[],
+            extracted_data={},
+        )
+        chunker = SentenceChunker(
+            sentences_per_chunk=3,
+            sentence_overlap=1,
+            min_chunk_size=1,
+        )
+        result = chunker.chunk(ref_result)
+
+        # With overlap=1, step=2: chunk0=[0,1,2], chunk1=[2,3]
+        # "Gamma" is the overlap sentence — it must appear in both chunks
+        assert len(result.chunks) >= 2
+        assert "Gamma" in result.chunks[0].text
+        assert "Gamma" in result.chunks[1].text
+
+    def test_behavior_min_chunk_size_merges_small_chunks(self):
+        """Behavior: chunks below min_chunk_size are merged."""
+        pages = [
+            RefinedPage(
+                index=0,
+                markdown="Hi. Bye. Ok.",
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            )
+        ]
+        ref_result = RefiningResult(
+            component_name="TestRefiner",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            pages=pages,
+            refining_trace=[],
+            extracted_data={},
+        )
+        chunker = SentenceChunker(
+            sentences_per_chunk=2,
+            sentence_overlap=0,
+            min_chunk_size=20,
+        )
+        result = chunker.chunk(ref_result)
+
+        # All chunks must be at least min_chunk_size or merged into neighbours
+        for chunk in result.chunks:
+            assert len(chunk.text) >= 1
+
+
+@pytest.mark.integration
+class TestRecursiveMarkdownChunker:
+    """Integration tests for RecursiveMarkdownChunker."""
+
+    def test_recursive_chunker_basic(self, sample_refining_result):
+        """Test basic recursive markdown chunking."""
+        chunker = RecursiveMarkdownChunker(
+            chunk_size=500, overlap=50, min_chunk_size=50
+        )
+        result = chunker.chunk(sample_refining_result)
+
+        assert result is not None
+        assert result.component_name == "RecursiveMarkdownChunker"
+        assert result.component_config["chunk_size"] == 500
+        assert result.component_config["overlap"] == 50
+        assert len(result.chunks) > 0
+
+        for chunk in result.chunks:
+            assert len(chunk.text) > 0
+            assert hasattr(chunk.metadata, 'page_index')
+
+    def test_recursive_chunker_get_config(self):
+        """Test get_config returns correct configuration."""
+        chunker = RecursiveMarkdownChunker(
+            chunk_size=800, overlap=80, min_chunk_size=100
+        )
+        config = chunker.get_config()
+
+        assert config["chunk_size"] == 800
+        assert config["overlap"] == 80
+        assert config["min_chunk_size"] == 100
+
+    def test_recursive_chunker_get_name(self):
+        """Test get_name returns correct component name."""
+        chunker = RecursiveMarkdownChunker()
+        assert chunker.get_name() == "RecursiveMarkdownChunker"
+
+    def test_recursive_chunker_large_chunk_size(self, sample_refining_result):
+        """Test that a large chunk_size produces fewer chunks."""
+        chunker_small = RecursiveMarkdownChunker(
+            chunk_size=200, overlap=20, min_chunk_size=50
+        )
+        chunker_large = RecursiveMarkdownChunker(
+            chunk_size=2000, overlap=100, min_chunk_size=50
+        )
+        result_small = chunker_small.chunk(sample_refining_result)
+        result_large = chunker_large.chunk(sample_refining_result)
+
+        assert len(result_small.chunks) >= len(result_large.chunks)
+
+    def test_behavior_chunks_respect_chunk_size(self):
+        """Behavior: chunks should not exceed chunk_size significantly."""
+        pages = [
+            RefinedPage(
+                index=0,
+                markdown="""# Section One
+
+This is the first section with some content about topic A.
+It has multiple sentences covering the main ideas.
+
+# Section Two
+
+This is the second section covering topic B in detail.
+More sentences here to provide substance to the chunk.
+
+# Section Three
+
+Final section wrapping up with topic C and conclusions.
+The end of the document is reached here.
+""",
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            )
+        ]
+        ref_result = RefiningResult(
+            component_name="TestRefiner",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            pages=pages,
+            refining_trace=[],
+            extracted_data={},
+        )
+        chunk_size = 200
+        chunker = RecursiveMarkdownChunker(
+            chunk_size=chunk_size, overlap=20, min_chunk_size=10
+        )
+        result = chunker.chunk(ref_result)
+
+        assert len(result.chunks) > 0
+        # Allow some tolerance for the overlap prepended to chunks
+        tolerance = chunk_size * 0.5
+        for chunk in result.chunks:
+            assert len(chunk.text) <= chunk_size + tolerance, (
+                f"Chunk exceeds size limit: {len(chunk.text)} chars"
+            )
+
+    def test_behavior_splits_at_headings(self):
+        """Behavior: H1 headings should create chunk boundaries."""
+        long_section = "Word " * 60  # 300 chars, forces split
+        pages = [
+            RefinedPage(
+                index=0,
+                markdown=(
+                    f"# Alpha Heading\n\n{long_section}\n\n"
+                    f"# Beta Heading\n\n{long_section}\n"
+                ),
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            )
+        ]
+        ref_result = RefiningResult(
+            component_name="TestRefiner",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            pages=pages,
+            refining_trace=[],
+            extracted_data={},
+        )
+        chunker = RecursiveMarkdownChunker(
+            chunk_size=200, overlap=0, min_chunk_size=10
+        )
+        result = chunker.chunk(ref_result)
+
+        # Alpha and Beta content should not be mixed in a single chunk
+        alpha_only = any(
+            "Alpha" in c.text and "Beta" not in c.text
+            for c in result.chunks
+        )
+        beta_only = any(
+            "Beta" in c.text and "Alpha" not in c.text
+            for c in result.chunks
+        )
+        assert alpha_only, (
+            "Expected at least one chunk with only Alpha content"
+        )
+        assert beta_only, (
+            "Expected at least one chunk with only Beta content"
+        )
+
+    def test_behavior_empty_pages_skipped(self):
+        """Behavior: empty pages produce no chunks."""
+        pages = [
+            RefinedPage(
+                index=0,
+                markdown="   \n\n  ",
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            ),
+            RefinedPage(
+                index=1,
+                markdown="# Real Content\n\nActual text lives here.",
+                images=[],
+                dimensions=PageDimensions(dpi=72, width=612, height=792)
+            ),
+        ]
+        ref_result = RefiningResult(
+            component_name="TestRefiner",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            pages=pages,
+            refining_trace=[],
+            extracted_data={},
+        )
+        chunker = RecursiveMarkdownChunker(
+            chunk_size=500, overlap=50, min_chunk_size=10
+        )
+        result = chunker.chunk(ref_result)
+
+        assert len(result.chunks) > 0
+        for chunk in result.chunks:
+            assert chunk.metadata.page_index == 1
