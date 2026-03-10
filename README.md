@@ -169,12 +169,81 @@ openai_embedder = OpenAIEmbedder(
 embedding_result = openai_embedder.embed_chunks(chunk_result)
 ```
 
+## Available Components
+
+### OCR
+
+| Class | Provider | Models | Key params |
+|-------|----------|--------|------------|
+| `MistralOCR` | Mistral | `mistral-ocr-2512` (default), `mistral-ocr-2505` | `api_key`, `model` |
+| `DatalabOCR` | Datalab | `marker` | `api_key`, `mode` (`fast` / `balanced` / `accurate`), `max_pages`, `page_range` |
+
+### Refiners
+
+| Class | What it does |
+|-------|-------------|
+| `ReferencesRefiner` | Detects and extracts the references/bibliography section. Stores in `extracted_data["references_markdown"]`. |
+| `FootnoteRefiner` | Detects footnotes, inlines explanations, and collects citations. |
+| `TableOfContentsRefiner` | Detects and removes the table of contents. Stores in `extracted_data["toc_markdown"]`. |
+
+### Chunkers
+
+| Class | Params (defaults) | When to use |
+|-------|-------------------|-------------|
+| `FixedSizeChunker` | `chunk_size=1000`, `overlap=200` | Fast, deterministic splitting by character count |
+| `SentenceChunker` | `sentences_per_chunk=5`, `sentence_overlap=1`, `min_chunk_size=100` | Sentence-aware sliding window, no external deps |
+| `RecursiveMarkdownChunker` | `chunk_size=1000`, `overlap=100` | Heading-aware hierarchical splitting (H1→H2→H3→H4→paragraph→sentence) |
+| `SemanticChunker` | `api_key`, `min_chunk_size=500` | LLM-based semantic boundary detection (uses Mistral) |
+
+### Embedders
+
+| Class | Provider | Models | Cost / 1M tokens |
+|-------|----------|--------|-------------------|
+| `MistralEmbedder` | Mistral | `mistral-embed` | $0.10 |
+| `OpenAIEmbedder` | OpenAI | `text-embedding-3-small`, `text-embedding-3-large` | $0.02 / $0.13 |
+| `VoyageAIEmbedder` | Voyage AI | `voyage-3`, `voyage-3-large`, `voyage-3-lite` | $0.06 / $0.18 / $0.02 |
+| `CohereEmbedder` | Cohere | `embed-v4.0`, `embed-english-v3.0`, `embed-multilingual-v3.0` | $0.12 / $0.10 / $0.10 |
+
+## Examples & Notebooks
+
+### Example scripts (`examples/`)
+
+| File | What it shows |
+|------|---------------|
+| [`01_basic_pipeline.py`](examples/01_basic_pipeline.py) | End-to-end `DocumentPipeline.process()` with MistralOCR + FixedSizeChunker + MistralEmbedder |
+| [`02_choosing_components.py`](examples/02_choosing_components.py) | Same doc with two combos (Mistral-only vs mixed providers) — compares chunks, dims, cost |
+| [`03_step_by_step.py`](examples/03_step_by_step.py) | Manual `run_ocr()` → `run_refiners()` → `run_chunker()` → `run_embedder()` with intermediate inspection |
+| [`04_cost_tracking.py`](examples/04_cost_tracking.py) | `TokenUsageTracker` standalone — per-model breakdown and total cost |
+
+```bash
+.venv/bin/python examples/01_basic_pipeline.py
+```
+
+### Notebooks (`notebooks/`)
+
+| File | What it shows |
+|------|---------------|
+| [`getting_started.ipynb`](notebooks/getting_started.ipynb) | Full pipeline walkthrough — one cell per stage |
+| [`component_comparison.ipynb`](notebooks/component_comparison.ipynb) | Compares FixedSize vs Sentence vs RecursiveMarkdown chunking strategies |
+| [`component_explorer.ipynb`](notebooks/component_explorer.ipynb) | Exercises every component with all valid configurations |
+
+Each notebook has a setup cell where you set `PDF_PATH` and `ENV_PATH` to point to your own document and API keys.
+
 ## Package layout
 
 ```
 ragbandit-core/
+├── examples/          # Runnable example scripts
+├── notebooks/         # Jupyter notebooks
 ├── src/ragbandit/
-│   ├── documents/   # document ingestion, OCR, chunking, 
+│   ├── config/        # Pricing and model configuration
+│   ├── documents/     # Document ingestion, OCR, chunking, embedding
+│   │   ├── chunkers/
+│   │   ├── embedders/
+│   │   ├── ocr/
+│   │   └── refiners/
+│   ├── prompt_tools/  # LLM-based tools
+│   └── utils/         # Token tracking, logging, client managers
 └── tests/
 ```
 
