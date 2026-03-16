@@ -223,12 +223,19 @@ class BaseChunker(ABC):
     ) -> list[Chunk]:
         """Populate each Chunk's metadata.images with inlined image data.
 
-        Looks for `![img-XX.jpeg](img-XX.jpeg)` markers inside the chunk text
-        and copies the matching `image_base64` from the corresponding page's
+        Looks for markdown image markers in the chunk text and copies
+        the matching ``image_base64`` from the corresponding page's
         images collection.
+
+        Supported filename patterns:
+        - ``img-<digits>.jpg/jpeg``  (e.g. ``img-01.jpeg``)
+        - ``<hash>_img.jpg``         (e.g. ``1b7d539e_img.jpg``)
         """
 
-        img_pattern = re.compile(r"!\[img-\d+\.jpeg\]\(img-\d+\.jpeg\)")
+        img_pattern = re.compile(
+            r"!\[[^\]]*\]"
+            r"\((img-\d+\.jpe?g|[a-f0-9]+_img\.jpe?g)\)"
+        )
 
         for chunk in chunks:
             images_in_chunk = img_pattern.findall(chunk.text)
@@ -241,8 +248,7 @@ class BaseChunker(ABC):
             rel_images = ref_result.pages[page_idx].images or []
             chunk.metadata.images = []
 
-            for img_tag in images_in_chunk:
-                img_id = img_tag.split("[")[1].split("]")[0]
+            for img_id in images_in_chunk:
                 for ocr_img in rel_images:
                     if ocr_img.id == img_id:
                         chunk.metadata.images.append(
