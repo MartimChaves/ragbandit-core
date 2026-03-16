@@ -83,7 +83,7 @@ if result.embedding_result:
 print("\n── Timings ──")
 t = result.timings
 print(f"  OCR         : {t.ocr:.2f}s")
-print(f"  Chunking    : {t.chunking:.2f}s")
+print(f"  Chunking    : {t.chunking}s")
 print(f"  Embedding   : {t.embedding:.2f}s")
 print(f"  Total       : {t.total_duration:.2f}s")
 
