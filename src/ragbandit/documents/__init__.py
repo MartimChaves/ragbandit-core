@@ -13,21 +13,26 @@ from ragbandit.documents.chunkers import (
     BaseChunker,
     FixedSizeChunker,
     SemanticChunker,
-    SemanticBreak
+    SemanticBreak,
+    SentenceChunker,
+    RecursiveMarkdownChunker,
 )
 
 # Import from refiners
 from ragbandit.documents.refiners import (
     BaseRefiner,
     FootnoteRefiner,
-    ReferencesRefiner
+    ReferencesRefiner,
+    TableOfContentsRefiner,
 )
 
 # Import from embedders
 from ragbandit.documents.embedders import (
     BaseEmbedder,
     MistralEmbedder,
-    OpenAIEmbedder
+    OpenAIEmbedder,
+    VoyageAIEmbedder,
+    CohereEmbedder,
 )
 
 # Import from OCR
@@ -46,16 +51,21 @@ __all__ = [
     "FixedSizeChunker",
     "SemanticChunker",
     "SemanticBreak",
+    "SentenceChunker",
+    "RecursiveMarkdownChunker",
 
     # Refiners
     "BaseRefiner",
     "FootnoteRefiner",
     "ReferencesRefiner",
+    "TableOfContentsRefiner",
 
     # Embedders
     "BaseEmbedder",
     "MistralEmbedder",
     "OpenAIEmbedder",
+    "VoyageAIEmbedder",
+    "CohereEmbedder",
 
     # OCR
     "BaseOCR",

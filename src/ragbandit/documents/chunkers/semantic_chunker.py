@@ -29,6 +29,7 @@ class SemanticChunker(BaseChunker):
         self,
         api_key: str,
         min_chunk_size: int = 500,
+        max_chunk_size: int | None = None,
     ):
         """
         Initialize the semantic chunker.
@@ -37,8 +38,10 @@ class SemanticChunker(BaseChunker):
             api_key: Mistral API Key
             min_chunk_size: Minimum size for chunks
                             (smaller chunks will be merged)
+            max_chunk_size: Hard upper limit on chunk size in characters.
+                Chunks exceeding this are split further. None means no limit.
         """
-        super().__init__()
+        super().__init__(max_chunk_size=max_chunk_size)
         self.api_key = api_key
         self.min_chunk_size = min_chunk_size
 
@@ -50,6 +53,7 @@ class SemanticChunker(BaseChunker):
         """
         return {
             "min_chunk_size": self.min_chunk_size,
+            "max_chunk_size": self.max_chunk_size,
         }
 
     def semantic_chunk_pages(
@@ -172,6 +176,9 @@ class SemanticChunker(BaseChunker):
 
         # Perform semantic chunking
         chunks = self.semantic_chunk_pages(pages, usage_tracker)
+
+        # Split any oversized chunks before image attachment
+        chunks = self._split_oversized_chunks(chunks)
 
         # Attach image data to chunks using shared helper
         chunks = self.attach_images(chunks, ref_result)

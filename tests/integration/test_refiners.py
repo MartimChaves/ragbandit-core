@@ -9,6 +9,7 @@ import pytest
 import os
 from ragbandit.documents.refiners.footnotes_refiner import FootnoteRefiner
 from ragbandit.documents.refiners.references_refiner import ReferencesRefiner
+from ragbandit.documents.refiners.toc_refiner import TableOfContentsRefiner
 from ragbandit.schema import (
     OCRResult,
     OCRPage,
@@ -323,3 +324,196 @@ class TestRefinerChaining:
         # Refining trace may not accumulate across multiple refiners
         # Just verify the result is valid
         assert isinstance(result2.refining_trace, list)
+
+
+@pytest.fixture
+def sample_ocr_result_with_toc():
+    """Create a sample OCR result with a Table of Contents section."""
+    pages = [
+        OCRPage(
+            index=0,
+            markdown="""# Table of Contents
+
+1. Introduction ............... 2
+2. Background ................. 5
+3. Methodology ................ 9
+4. Results ................... 14
+5. Conclusion ................ 20
+
+""",
+            images=[],
+            dimensions=PageDimensions(dpi=72, width=612, height=792)
+        ),
+        OCRPage(
+            index=1,
+            markdown="""# Introduction
+
+This paper presents a thorough investigation into the subject matter.
+The findings have important implications for the field.
+
+# Background
+
+Previous work in this area has established key foundations.
+Several authors have contributed significantly to our understanding.
+
+# Conclusion
+
+In conclusion, the results confirm the initial hypothesis.
+Future work should explore the remaining open questions.
+""",
+            images=[],
+            dimensions=PageDimensions(dpi=72, width=612, height=792)
+        ),
+    ]
+    return OCRResult(
+        component_name="MistralOCR",
+        component_config={"model": "mistral-ocr-2512"},
+        source_file_path="/test/sample.pdf",
+        processed_at=datetime.now(timezone.utc),
+        model="mistral-ocr-2512",
+        pages=pages,
+        usage_info=OCRUsageInfo(pages_processed=2, doc_size_bytes=2048),
+    )
+
+
+@pytest.fixture
+def sample_ocr_result_without_toc():
+    """Create a sample OCR result with no Table of Contents."""
+    pages = [
+        OCRPage(
+            index=0,
+            markdown="""# Introduction
+
+This document has no table of contents.
+It goes straight into the content.
+
+# Methods
+
+We used standard methods throughout the study.
+The analysis was performed carefully.
+""",
+            images=[],
+            dimensions=PageDimensions(dpi=72, width=612, height=792)
+        ),
+    ]
+    return OCRResult(
+        component_name="MistralOCR",
+        component_config={"model": "mistral-ocr-2512"},
+        source_file_path="/test/sample.pdf",
+        processed_at=datetime.now(timezone.utc),
+        model="mistral-ocr-2512",
+        pages=pages,
+        usage_info=OCRUsageInfo(pages_processed=1, doc_size_bytes=1024),
+    )
+
+
+@pytest.mark.integration
+class TestTableOfContentsRefiner:
+    """Integration tests for TableOfContentsRefiner with real API calls."""
+
+    def test_toc_refiner_process(
+        self, mistral_api_key, sample_ocr_result_with_toc
+    ):
+        """Test TOC refiner processes document correctly."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+        tracker = TokenUsageTracker()
+
+        result = refiner.process(
+            sample_ocr_result_with_toc,
+            usage_tracker=tracker
+        )
+
+        assert result is not None
+        assert result.component_name == "TableOfContentsRefiner"
+        assert "extract_toc" in result.component_config
+        assert "remove_from_document" in result.component_config
+        assert len(result.pages) > 0
+        assert result.metrics is not None
+        assert result.metrics.total_tokens > 0
+
+    def test_toc_refiner_get_config(self, mistral_api_key):
+        """Test get_config returns correct configuration."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+        config = refiner.get_config()
+
+        assert config["extract_toc"] is True
+        assert config["remove_from_document"] is True
+
+    def test_toc_refiner_get_name(self, mistral_api_key):
+        """Test get_name returns correct component name."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+        assert refiner.get_name() == "TableOfContentsRefiner"
+
+    def test_toc_refiner_accepts_refining_result(
+        self, mistral_api_key, sample_ocr_result_with_toc
+    ):
+        """Test refiner accepts RefiningResult as input (chaining)."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+
+        result1 = refiner.process(sample_ocr_result_with_toc)
+        result2 = refiner.process(result1)
+
+        assert result2 is not None
+        assert result2.component_name == "TableOfContentsRefiner"
+
+    def test_behavior_toc_removed_from_body(
+        self, mistral_api_key, sample_ocr_result_with_toc
+    ):
+        """Behavior: TOC content must be absent from page markdown after
+        processing."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+        result = refiner.process(sample_ocr_result_with_toc)
+
+        full_body = "".join(p.markdown for p in result.pages)
+
+        # The TOC entry lines (e.g. "Introduction ... 2") should be gone
+        assert "..............." not in full_body, (
+            "TOC dot-leaders still present in body markdown"
+        )
+
+    def test_behavior_toc_stored_in_extracted_data(
+        self, mistral_api_key, sample_ocr_result_with_toc
+    ):
+        """Behavior: extracted TOC is stored in extracted_data."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+        result = refiner.process(sample_ocr_result_with_toc)
+
+        assert result.extracted_data is not None
+        assert "toc_markdown" in result.extracted_data, (
+            "toc_markdown key missing from extracted_data"
+        )
+        toc = result.extracted_data["toc_markdown"]
+        assert isinstance(toc, str)
+        assert len(toc) > 0
+
+    def test_behavior_body_content_preserved(
+        self, mistral_api_key, sample_ocr_result_with_toc
+    ):
+        """Behavior: non-TOC body content must survive refinement."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+        result = refiner.process(sample_ocr_result_with_toc)
+
+        full_body = "".join(p.markdown for p in result.pages)
+
+        # Key body sections from page 1 must remain intact
+        assert "Introduction" in full_body
+        assert "Background" in full_body
+        assert "Conclusion" in full_body
+
+    def test_behavior_no_toc_document_unchanged(
+        self, mistral_api_key, sample_ocr_result_without_toc
+    ):
+        """Behavior: document without TOC passes through unmodified."""
+        refiner = TableOfContentsRefiner(api_key=mistral_api_key)
+        result = refiner.process(sample_ocr_result_without_toc)
+
+        original_body = "".join(
+            p.markdown for p in sample_ocr_result_without_toc.pages
+        )
+        result_body = "".join(p.markdown for p in result.pages)
+
+        # Body should be unchanged
+        assert result_body == original_body
+
+        # No toc_markdown should be stored
+        assert "toc_markdown" not in (result.extracted_data or {})

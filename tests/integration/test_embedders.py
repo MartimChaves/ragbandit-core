@@ -10,6 +10,8 @@ import os
 import numpy as np
 from ragbandit.documents.embedders.mistral_embedder import MistralEmbedder
 from ragbandit.documents.embedders.openai_embedder import OpenAIEmbedder
+from ragbandit.documents.embedders.voyage_ai_embedder import VoyageAIEmbedder
+from ragbandit.documents.embedders.cohere_embedder import CohereEmbedder
 from ragbandit.schema import ChunkingResult, Chunk, ChunkMetadata
 from ragbandit.utils.token_usage_tracker import TokenUsageTracker
 from datetime import datetime, timezone
@@ -30,6 +32,24 @@ def openai_api_key():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set")
+    return api_key
+
+
+@pytest.fixture
+def voyage_api_key():
+    """Get Voyage AI API key from environment."""
+    api_key = os.getenv("VOYAGE_API_KEY")
+    if not api_key:
+        pytest.skip("VOYAGE_API_KEY not set")
+    return api_key
+
+
+@pytest.fixture
+def cohere_api_key():
+    """Get Cohere API key from environment."""
+    api_key = os.getenv("COHERE_API_KEY")
+    if not api_key:
+        pytest.skip("COHERE_API_KEY not set")
     return api_key
 
 
@@ -638,3 +658,356 @@ class TestOpenAIEmbedder:
         # Input/output tokens should be 0 for embeddings
         assert result.metrics.total_input_tokens == 0
         assert result.metrics.total_output_tokens == 0
+
+
+@pytest.mark.integration
+class TestVoyageAIEmbedder:
+    """Integration tests for VoyageAIEmbedder with real API calls."""
+
+    def test_embedder_basic(self, voyage_api_key, sample_chunking_result):
+        """Test basic embedding with voyage-3."""
+        embedder = VoyageAIEmbedder(
+            api_key=voyage_api_key, model="voyage-3"
+        )
+        result = embedder.embed_chunks(sample_chunking_result)
+
+        assert result is not None
+        assert result.component_name == "VoyageAIEmbedder"
+        assert result.model_name == "voyage-3"
+        assert len(result.chunks_with_embeddings) == 5
+
+        for chunk_with_emb in result.chunks_with_embeddings:
+            assert len(chunk_with_emb.embedding) > 0
+            assert chunk_with_emb.embedding_model == "voyage-3"
+            assert len(chunk_with_emb.text) > 0
+            assert hasattr(chunk_with_emb.metadata, 'page_index')
+
+    def test_embedder_invalid_model_raises_error(self, voyage_api_key):
+        """Test that invalid model raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid model"):
+            VoyageAIEmbedder(
+                api_key=voyage_api_key, model="invalid-model"
+            )
+
+    def test_embedder_get_config(self, voyage_api_key):
+        """Test get_config returns correct configuration."""
+        embedder = VoyageAIEmbedder(
+            api_key=voyage_api_key, model="voyage-3"
+        )
+        config = embedder.get_config()
+
+        assert "model" in config
+        assert config["model"] == "voyage-3"
+
+    def test_embedder_get_name(self, voyage_api_key):
+        """Test get_name returns correct component name."""
+        embedder = VoyageAIEmbedder(api_key=voyage_api_key)
+        assert embedder.get_name() == "VoyageAIEmbedder"
+
+    def test_embedder_empty_chunks(self, voyage_api_key):
+        """Test embedder handles empty chunk list."""
+        embedder = VoyageAIEmbedder(api_key=voyage_api_key)
+        empty_result = ChunkingResult(
+            component_name="TestChunker",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            chunks=[],
+        )
+        result = embedder.embed_chunks(empty_result)
+
+        assert result is not None
+        assert len(result.chunks_with_embeddings) == 0
+
+    def test_embedder_preserves_metadata(
+        self, voyage_api_key, sample_chunking_result
+    ):
+        """Test that embedder preserves chunk metadata."""
+        embedder = VoyageAIEmbedder(api_key=voyage_api_key)
+        result = embedder.embed_chunks(sample_chunking_result)
+
+        for i, chunk_with_emb in enumerate(result.chunks_with_embeddings):
+            original_chunk = sample_chunking_result.chunks[i]
+            assert chunk_with_emb.text == original_chunk.text
+            assert (
+                chunk_with_emb.metadata.page_index
+                == original_chunk.metadata.page_index
+            )
+
+    def test_behavior_embedding_dimensions_consistent(
+        self, voyage_api_key, sample_chunking_result
+    ):
+        """Behavior: all embeddings must share the same dimension."""
+        embedder = VoyageAIEmbedder(
+            api_key=voyage_api_key, model="voyage-3"
+        )
+        result = embedder.embed_chunks(sample_chunking_result)
+
+        dims = [
+            len(c.embedding) for c in result.chunks_with_embeddings
+        ]
+        assert len(set(dims)) == 1, "Inconsistent embedding dimensions"
+        assert dims[0] > 0
+
+    def test_behavior_similar_texts_high_similarity(self, voyage_api_key):
+        """Behavior: similar texts should have high cosine similarity."""
+        embedder = VoyageAIEmbedder(api_key=voyage_api_key)
+        chunks = [
+            Chunk(
+                text="The quick brown fox jumps over the lazy dog.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+            Chunk(
+                text="A quick brown fox jumps over a lazy dog.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+        ]
+        chunking_result = ChunkingResult(
+            component_name="TestChunker",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            chunks=chunks,
+        )
+        result = embedder.embed_chunks(chunking_result)
+
+        emb1 = np.array(result.chunks_with_embeddings[0].embedding)
+        emb2 = np.array(result.chunks_with_embeddings[1].embedding)
+        similarity = embedder.cosine_similarity(emb1, emb2)
+
+        assert similarity > 0.9, (
+            f"Similar texts should have high similarity, got {similarity}"
+        )
+
+    def test_behavior_dissimilar_texts_lower_similarity(
+        self, voyage_api_key
+    ):
+        """Behavior: dissimilar texts should have lower similarity."""
+        embedder = VoyageAIEmbedder(api_key=voyage_api_key)
+        chunks = [
+            Chunk(
+                text="Quantum mechanics describes subatomic particles.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+            Chunk(
+                text="Chocolate cake recipe with vanilla frosting.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+        ]
+        chunking_result = ChunkingResult(
+            component_name="TestChunker",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            chunks=chunks,
+        )
+        result = embedder.embed_chunks(chunking_result)
+
+        emb1 = np.array(result.chunks_with_embeddings[0].embedding)
+        emb2 = np.array(result.chunks_with_embeddings[1].embedding)
+        similarity = embedder.cosine_similarity(emb1, emb2)
+
+        assert similarity < 0.7, (
+            f"Dissimilar texts should have lower similarity, got {similarity}"
+        )
+
+    def test_behavior_token_usage_tracked(
+        self, voyage_api_key, sample_chunking_result
+    ):
+        """Behavior: token usage is tracked when tracker provided."""
+        embedder = VoyageAIEmbedder(api_key=voyage_api_key)
+        tracker = TokenUsageTracker()
+        result = embedder.embed_chunks(sample_chunking_result, tracker)
+
+        assert result.metrics is not None
+        assert result.metrics.total_tokens > 0
+        assert result.metrics.total_embedding_tokens > 0
+        assert result.metrics.total_input_tokens == 0
+        assert result.metrics.total_output_tokens == 0
+
+
+@pytest.mark.integration
+class TestCohereEmbedder:
+    """Integration tests for CohereEmbedder with real API calls."""
+
+    def test_embedder_basic(self, cohere_api_key, sample_chunking_result):
+        """Test basic embedding with embed-v4.0."""
+        embedder = CohereEmbedder(
+            api_key=cohere_api_key, model="embed-v4.0"
+        )
+        result = embedder.embed_chunks(sample_chunking_result)
+
+        assert result is not None
+        assert result.component_name == "CohereEmbedder"
+        assert result.model_name == "embed-v4.0"
+        assert len(result.chunks_with_embeddings) == 5
+
+        for chunk_with_emb in result.chunks_with_embeddings:
+            assert len(chunk_with_emb.embedding) > 0
+            assert chunk_with_emb.embedding_model == "embed-v4.0"
+            assert len(chunk_with_emb.text) > 0
+            assert hasattr(chunk_with_emb.metadata, 'page_index')
+
+    def test_embedder_invalid_model_raises_error(self, cohere_api_key):
+        """Test that invalid model raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid model"):
+            CohereEmbedder(
+                api_key=cohere_api_key, model="invalid-model"
+            )
+
+    def test_embedder_get_config(self, cohere_api_key):
+        """Test get_config returns correct configuration."""
+        embedder = CohereEmbedder(
+            api_key=cohere_api_key,
+            model="embed-v4.0",
+            input_type="search_document",
+        )
+        config = embedder.get_config()
+
+        assert config["model"] == "embed-v4.0"
+        assert config["input_type"] == "search_document"
+
+    def test_embedder_get_name(self, cohere_api_key):
+        """Test get_name returns correct component name."""
+        embedder = CohereEmbedder(api_key=cohere_api_key)
+        assert embedder.get_name() == "CohereEmbedder"
+
+    def test_embedder_empty_chunks(self, cohere_api_key):
+        """Test embedder handles empty chunk list."""
+        embedder = CohereEmbedder(api_key=cohere_api_key)
+        empty_result = ChunkingResult(
+            component_name="TestChunker",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            chunks=[],
+        )
+        result = embedder.embed_chunks(empty_result)
+
+        assert result is not None
+        assert len(result.chunks_with_embeddings) == 0
+
+    def test_embedder_preserves_metadata(
+        self, cohere_api_key, sample_chunking_result
+    ):
+        """Test that embedder preserves chunk metadata."""
+        embedder = CohereEmbedder(api_key=cohere_api_key)
+        result = embedder.embed_chunks(sample_chunking_result)
+
+        for i, chunk_with_emb in enumerate(result.chunks_with_embeddings):
+            original_chunk = sample_chunking_result.chunks[i]
+            assert chunk_with_emb.text == original_chunk.text
+            assert (
+                chunk_with_emb.metadata.page_index
+                == original_chunk.metadata.page_index
+            )
+
+    def test_behavior_embedding_dimensions_consistent(
+        self, cohere_api_key, sample_chunking_result
+    ):
+        """Behavior: all embeddings must share the same dimension."""
+        embedder = CohereEmbedder(
+            api_key=cohere_api_key, model="embed-v4.0"
+        )
+        result = embedder.embed_chunks(sample_chunking_result)
+
+        dims = [
+            len(c.embedding) for c in result.chunks_with_embeddings
+        ]
+        assert len(set(dims)) == 1, "Inconsistent embedding dimensions"
+        assert dims[0] > 0
+
+    def test_behavior_similar_texts_high_similarity(self, cohere_api_key):
+        """Behavior: similar texts should have high cosine similarity."""
+        embedder = CohereEmbedder(api_key=cohere_api_key)
+        chunks = [
+            Chunk(
+                text="The quick brown fox jumps over the lazy dog.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+            Chunk(
+                text="A quick brown fox jumps over a lazy dog.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+        ]
+        chunking_result = ChunkingResult(
+            component_name="TestChunker",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            chunks=chunks,
+        )
+        result = embedder.embed_chunks(chunking_result)
+
+        emb1 = np.array(result.chunks_with_embeddings[0].embedding)
+        emb2 = np.array(result.chunks_with_embeddings[1].embedding)
+        similarity = embedder.cosine_similarity(emb1, emb2)
+
+        assert similarity > 0.9, (
+            f"Similar texts should have high similarity, got {similarity}"
+        )
+
+    def test_behavior_dissimilar_texts_lower_similarity(
+        self, cohere_api_key
+    ):
+        """Behavior: dissimilar texts should have lower similarity."""
+        embedder = CohereEmbedder(api_key=cohere_api_key)
+        chunks = [
+            Chunk(
+                text="Quantum mechanics describes subatomic particles.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+            Chunk(
+                text="Chocolate cake recipe with vanilla frosting.",
+                metadata=ChunkMetadata(page_index=0)
+            ),
+        ]
+        chunking_result = ChunkingResult(
+            component_name="TestChunker",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            chunks=chunks,
+        )
+        result = embedder.embed_chunks(chunking_result)
+
+        emb1 = np.array(result.chunks_with_embeddings[0].embedding)
+        emb2 = np.array(result.chunks_with_embeddings[1].embedding)
+        similarity = embedder.cosine_similarity(emb1, emb2)
+
+        assert similarity < 0.7, (
+            f"Dissimilar texts should have lower similarity, got {similarity}"
+        )
+
+    def test_behavior_input_type_affects_embeddings(self, cohere_api_key):
+        """Behavior: document vs query input_type produces different vecs."""
+        chunks = [
+            Chunk(
+                text="Machine learning is a branch of artificial intelligence.",  # noqa:E501
+                metadata=ChunkMetadata(page_index=0)
+            ),
+        ]
+        chunking_result = ChunkingResult(
+            component_name="TestChunker",
+            component_config={},
+            processed_at=datetime.now(timezone.utc),
+            chunks=chunks,
+        )
+        doc_embedder = CohereEmbedder(
+            api_key=cohere_api_key,
+            model="embed-v4.0",
+            input_type="search_document",
+        )
+        query_embedder = CohereEmbedder(
+            api_key=cohere_api_key,
+            model="embed-v4.0",
+            input_type="search_query",
+        )
+        doc_result = doc_embedder.embed_chunks(chunking_result)
+        query_result = query_embedder.embed_chunks(chunking_result)
+
+        doc_emb = np.array(
+            doc_result.chunks_with_embeddings[0].embedding
+        )
+        query_emb = np.array(
+            query_result.chunks_with_embeddings[0].embedding
+        )
+
+        # Same text with different input_type should differ
+        assert not np.allclose(doc_emb, query_emb), (
+            "Document and query embeddings should differ for same text"
+        )

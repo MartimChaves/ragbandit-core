@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-09
+
+### Added
+- **SentenceChunker**: Sentence-aware sliding-window chunker with configurable `sentences_per_chunk`, `sentence_overlap`, and `min_chunk_size`. Pure-Python regex splitting, no external dependencies.
+- **RecursiveMarkdownChunker**: Hierarchical chunker that splits by heading level (H1→H2→H3→H4), then paragraph, then sentence, with overlap merging.
+- **VoyageAIEmbedder**: Embedder using Voyage AI models — `voyage-3`, `voyage-3-large`, `voyage-3-lite`.
+- **CohereEmbedder**: Embedder using Cohere models — `embed-v4.0`, `embed-english-v3.0`, `embed-multilingual-v3.0`. Supports configurable `input_type` for search documents vs queries.
+- **TableOfContentsRefiner**: Refiner that detects and removes the table of contents section, storing it in `extracted_data["toc_markdown"]`.
+- **Example scripts** (`examples/`): 4 runnable Python scripts demonstrating basic pipeline usage, component comparison, step-by-step execution, and cost tracking.
+- **Jupyter notebooks** (`notebooks/`): 3 interactive notebooks — getting started walkthrough, chunker comparison, and a component explorer exercising every component with all valid configurations.
+- **README component reference tables**: OCR, Refiners, Chunkers, and Embedders with models, parameters, defaults, and costs per 1M tokens.
+- **README examples & notebooks section** linking to all new files with descriptions.
+
+### Changed
+- Updated README package layout tree to include `examples/`, `notebooks/`, and expanded `src/ragbandit/` subdirectories
+
+### Dependencies
+- Added `voyageai` for Voyage AI embeddings support
+- Added `cohere` for Cohere embeddings support
+
 ## [0.2.6] - 2026-02-27
 
 ### Added
@@ -91,7 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note**: Versions 0.1.0 and 0.1.1 were initial setup releases. Version 0.1.2 is the first production-ready release with comprehensive test coverage.
 
-[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.3...v0.2.4
