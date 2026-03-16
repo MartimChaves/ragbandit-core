@@ -142,7 +142,9 @@ class TableOfContentsRefiner(BaseRefiner):
             return ref_result, ""
 
         # The section immediately after the TOC header marks the TOC's end
-        next_header = self._find_next_header(headers, toc_header_index)
+        next_header = self._find_next_header(
+            headers, toc_header_index, ref_result
+        )
 
         boundaries = self._find_toc_boundaries(
             ref_result, toc_header, next_header
@@ -209,23 +211,50 @@ class TableOfContentsRefiner(BaseRefiner):
         return self.find_best_match(toc.toc_header, headers)
 
     def _find_next_header(
-        self, headers: list[str], toc_header_index: int
+        self,
+        headers: list[str],
+        toc_header_index: int,
+        ref_result: RefiningResult,
     ) -> str | None:
-        """Return the header immediately following the TOC header.
+        """Return the first header after the TOC that starts real content.
 
-        This header marks the start of the first post-TOC section and
-        therefore delimits the end of the TOC content.
+        Unlike the simple ``headers[toc_header_index + 1]`` approach, this
+        skips sub-headers that are still part of the TOC structure (e.g.
+        ``## General``, ``## Section I``) by checking whether the content
+        immediately following each candidate header looks like TOC entries
+        (lines with dot-leaders or trailing page numbers).
 
         Args:
             headers: List of all headers in the document.
             toc_header_index: Index of the identified TOC header.
+            ref_result: RefiningResult used to inspect page content.
 
         Returns:
-            The next header string, or None if the TOC header is last.
+            The first header whose following content is not TOC-like,
+            or None if the TOC runs to the end of the document.
         """
-        if toc_header_index < 0 or (toc_header_index + 1) >= len(headers):
+        if toc_header_index < 0:
             return None
-        return headers[toc_header_index + 1]
+
+        toc_entry_pattern = re.compile(
+            r"(?:\.{2,}\s*\d+|\b\d+\s*$)", re.MULTILINE
+        )
+
+        for i in range(toc_header_index + 1, len(headers)):
+            candidate = headers[i].strip()
+            for page in ref_result.pages:
+                pos = page.markdown.find(candidate)
+                if pos == -1:
+                    continue
+                after = page.markdown[
+                    pos + len(candidate): pos + len(candidate) + 300
+                ]
+                toc_matches = toc_entry_pattern.findall(after)
+                if len(toc_matches) < 3:
+                    return headers[i]  # This header starts real content
+                break  # Found the header but it's TOC-like; try next header
+
+        return None
 
     def _find_toc_boundaries(
         self,
