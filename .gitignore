@@ -1,3 +1,4 @@
+build
 tests/.env
 ragbandit_core.egg-info
 __pycache__

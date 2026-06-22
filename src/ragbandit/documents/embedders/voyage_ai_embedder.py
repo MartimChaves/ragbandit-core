@@ -2,7 +2,8 @@
 Voyage AI embedder for generating document embeddings.
 
 Uses the voyageai SDK to embed document chunks in batches.
-Supports voyage-3-large, voyage-3, and voyage-3-lite models.
+Supports voyage-3-large, voyage-3.5, voyage-3.5-lite, voyage-3, and
+voyage-3-lite models.
 """
 
 from datetime import datetime, timezone
@@ -28,6 +29,8 @@ class VoyageAIEmbedder(BaseEmbedder):
 
     VALID_MODELS = [
         "voyage-3-large",
+        "voyage-3.5",
+        "voyage-3.5-lite",
         "voyage-3",
         "voyage-3-lite",
     ]
@@ -36,7 +39,7 @@ class VoyageAIEmbedder(BaseEmbedder):
     def __init__(
         self,
         api_key: str,
-        model: str = "voyage-3",
+        model: str = "voyage-3.5",
     ):
         """
         Initialize the Voyage AI embedder.

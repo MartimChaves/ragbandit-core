@@ -66,13 +66,13 @@ class TestMistralOCR:
         """Test OCR processing with specific model."""
         ocr = MistralOCR(
             api_key=mistral_api_key,
-            model="mistral-ocr-2505"
+            model="mistral-ocr-2512"
         )
         result = ocr.process(sample_pdf_path)
 
         assert result.component_name == "MistralOCR"
-        assert result.component_config["model"] == "mistral-ocr-2505"
-        assert result.model == "mistral-ocr-2505"
+        assert result.component_config["model"] == "mistral-ocr-2512"
+        assert result.model == "mistral-ocr-2512"
         assert len(result.pages) > 0
 
     def test_ocr_invalid_model_raises_error(self, mistral_api_key):
