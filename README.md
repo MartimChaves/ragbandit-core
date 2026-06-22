@@ -175,7 +175,7 @@ embedding_result = openai_embedder.embed_chunks(chunk_result)
 
 | Class | Provider | Models | Key params |
 |-------|----------|--------|------------|
-| `MistralOCR` | Mistral | `mistral-ocr-2512` (default), `mistral-ocr-2505` | `api_key`, `model` |
+| `MistralOCR` | Mistral | `mistral-ocr-2512` (default) | `api_key`, `model` |
 | `DatalabOCR` | Datalab | `marker` | `api_key`, `mode` (`fast` / `balanced` / `accurate`), `max_pages`, `page_range` |
 
 ### Refiners
@@ -201,8 +201,8 @@ embedding_result = openai_embedder.embed_chunks(chunk_result)
 |-------|----------|--------|-------------------|
 | `MistralEmbedder` | Mistral | `mistral-embed` | $0.10 |
 | `OpenAIEmbedder` | OpenAI | `text-embedding-3-small`, `text-embedding-3-large` | $0.02 / $0.13 |
-| `VoyageAIEmbedder` | Voyage AI | `voyage-3`, `voyage-3-large`, `voyage-3-lite` | $0.06 / $0.18 / $0.02 |
-| `CohereEmbedder` | Cohere | `embed-v4.0`, `embed-english-v3.0`, `embed-multilingual-v3.0` | $0.12 / $0.10 / $0.10 |
+| `VoyageAIEmbedder` | Voyage AI | `voyage-3.5` (default), `voyage-3.5-lite`, `voyage-3-large`, `voyage-3`, `voyage-3-lite` | $0.06 / $0.02 / $0.18 / $0.06 / $0.02 |
+| `CohereEmbedder` | Cohere | `embed-v4.0` | $0.12 |
 
 ## Examples & Notebooks
 

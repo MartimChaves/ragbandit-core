@@ -2,7 +2,7 @@
 Cohere embedder for generating document embeddings.
 
 Uses the cohere SDK to embed document chunks in batches.
-Supports embed-v4.0, embed-english-v3.0, and embed-multilingual-v3.0 models.
+Supports the embed-v4.0 model.
 """
 
 from datetime import datetime, timezone
@@ -29,8 +29,6 @@ class CohereEmbedder(BaseEmbedder):
 
     VALID_MODELS = [
         "embed-v4.0",
-        "embed-english-v3.0",
-        "embed-multilingual-v3.0",
     ]
     BATCH_SIZE = 96  # Cohere maximum texts per request
 

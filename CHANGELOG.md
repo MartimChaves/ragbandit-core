@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-15
+
+### Added
+- **VoyageAIEmbedder**: Added `voyage-3.5` (now the default) and `voyage-3.5-lite`
+  models. Both output 1024 dimensions and match the price of the `voyage-3`
+  family ($0.06 / $0.02 per 1M tokens).
+
+### Changed
+- **Mistral pricing** (`config/pricing.py`): updated `mistral-medium-latest` to
+  Mistral Medium 3.5 pricing ($1.5 / $7.5 per 1M tokens).
+- **MAX_PROMPT_TOKENS** (`config/llms.py`): refreshed context windows for the
+  current Mistral `-latest` aliases (Small 4: 256k, Medium 3.5 / Large 3: 128k).
+
+### Removed
+- **MistralOCR**: removed `mistral-ocr-2505` (deprecated by Mistral, retired
+  2026-02-27). `mistral-ocr-2512` (OCR 3) is the only supported model.
+- **CohereEmbedder**: removed deprecated `embed-english-v3.0` and
+  `embed-multilingual-v3.0`. `embed-v4.0` is the only supported model.
+- **MAX_PROMPT_TOKENS**: removed dead OpenAI entries (`gpt-3.5-turbo`, `gpt-4`,
+  `gpt-4-turbo`); `gpt-4` was retired from the OpenAI API and none were used.
+
 ## [0.3.0] - 2026-03-09
 
 ### Added

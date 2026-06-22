@@ -21,14 +21,11 @@ DEFAULT_RETRY_DELAY = 2.0  # seconds (initial delay)
 DEFAULT_BACKOFF_FACTOR = 2.0  # exponential backoff factor
 DEFAULT_TIMEOUT = 30.0  # seconds
 
-# Token limits
+# Token limits (context windows, as of June 2026)
 MAX_PROMPT_TOKENS = {
-    "mistral-small-latest": 8000,
-    "mistral-medium-latest": 32000,
-    "mistral-large-latest": 32000,
-    "gpt-3.5-turbo": 4096,
-    "gpt-4": 8192,
-    "gpt-4-turbo": 128000,
+    "mistral-small-latest": 256000,   # Mistral Small 4
+    "mistral-medium-latest": 128000,  # Mistral Medium 3.5
+    "mistral-large-latest": 128000,   # Mistral Large 3
 }
 
 # System prompts
