@@ -19,10 +19,10 @@ from ragbandit.schema import (
 class DatalabOCR(BaseOCR):
     """OCR component using Datalab API that returns OCRResult schema."""
 
-    # Valid model names for Datalab OCR
-    VALID_MODELS = [
-        "marker",  # Currently the only available model
-    ]
+    # Identifier recorded on results. The Datalab convert API no longer
+    # exposes a selectable model; the processing `mode` is the only knob
+    # and Datalab picks the underlying model from it.
+    MODEL_LABEL = "datalab"
 
     # Valid mode names for Datalab OCR
     VALID_MODES = [
@@ -35,7 +35,6 @@ class DatalabOCR(BaseOCR):
         self,
         api_key: str | None = None,
         base_url: str = "https://www.datalab.to/api/v1",
-        model: str = "marker",
         mode: str = "balanced",
         output_format: str = "markdown",
         max_pages: int | None = None,
@@ -53,8 +52,8 @@ class DatalabOCR(BaseOCR):
         Args:
             api_key: Datalab API key (or set DATALAB_API_KEY env var)
             base_url: Base URL for Datalab API
-            model: OCR model to use (must be in VALID_MODELS)
-            mode: Processing mode (fast, balanced, accurate)
+            mode: Processing mode (fast, balanced, accurate). Datalab
+                selects the underlying model based on this mode.
             output_format: Output format (markdown, html, json, chunks)
             max_pages: Maximum pages to process
             page_range: Specific pages (e.g., "0-5,10", 0-indexed)
@@ -66,15 +65,8 @@ class DatalabOCR(BaseOCR):
             **kwargs: Additional keyword arguments
 
         Raises:
-            ValueError: If model is not in VALID_MODELS
             ValueError: If mode is not in VALID_MODES
         """
-        if model not in self.VALID_MODELS:
-            raise ValueError(
-                f"Invalid model '{model}'. "
-                f"Must be one of: {', '.join(self.VALID_MODELS)}"
-            )
-
         if mode not in self.VALID_MODES:
             raise ValueError(
                 f"Invalid mode '{mode}'. "
@@ -83,7 +75,7 @@ class DatalabOCR(BaseOCR):
 
         super().__init__(logger=logger, **kwargs)
 
-        self.model = model
+        self.model = self.MODEL_LABEL
         self.api_key = api_key or os.getenv("DATALAB_API_KEY")
         if not self.api_key:
             raise ValueError(
@@ -126,7 +118,7 @@ class DatalabOCR(BaseOCR):
         self, file_path: str, data: dict
     ) -> str:
         """Submit OCR job to Datalab API and return check URL."""
-        url = f"{self.base_url}/marker"
+        url = f"{self.base_url}/convert"
         file_path_obj = Path(file_path)
 
         with open(file_path_obj, "rb") as f:
@@ -303,7 +295,6 @@ class DatalabOCR(BaseOCR):
             dict: Configuration dictionary
         """
         return {
-            "model": self.model,
             "mode": self.mode,
             "max_pages": self.max_pages,
             "page_range": self.page_range,

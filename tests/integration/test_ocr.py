@@ -132,17 +132,17 @@ class TestMistralOCR:
 class TestDatalabOCR:
     """Integration tests for DatalabOCR with real API calls."""
 
-    def test_ocr_with_default_model(self, datalab_api_key, sample_pdf_path):
-        """Test OCR processing with default model (marker)."""
+    def test_ocr_with_defaults(self, datalab_api_key, sample_pdf_path):
+        """Test OCR processing with default settings."""
         ocr = DatalabOCR(api_key=datalab_api_key)
         result = ocr.process(sample_pdf_path)
 
         assert result is not None
         assert result.component_name == "DatalabOCR"
-        assert "model" in result.component_config
+        assert "mode" in result.component_config
         assert result.source_file_path == sample_pdf_path
         assert len(result.pages) > 0
-        assert result.model == "marker"
+        assert result.model == "datalab"
 
         # Check first page has content
         first_page = result.pages[0]
@@ -165,14 +165,6 @@ class TestDatalabOCR:
             assert result.component_config["mode"] == mode
             assert len(result.pages) > 0
 
-    def test_ocr_invalid_model_raises_error(self, datalab_api_key):
-        """Test that invalid model raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid model"):
-            DatalabOCR(
-                api_key=datalab_api_key,
-                model="invalid-model"
-            )
-
     def test_ocr_invalid_mode_raises_error(self, datalab_api_key):
         """Test that invalid mode raises ValueError."""
         with pytest.raises(ValueError, match="Invalid mode"):
@@ -185,15 +177,13 @@ class TestDatalabOCR:
         """Test get_config returns correct configuration."""
         ocr = DatalabOCR(
             api_key=datalab_api_key,
-            model="marker",
             mode="balanced",
             max_pages=10,
             disable_image_extraction=True
         )
         config = ocr.get_config()
 
-        assert "model" in config
-        assert config["model"] == "marker"
+        assert "model" not in config
         assert config["mode"] == "balanced"
         assert config["max_pages"] == 10
         assert config["disable_image_extraction"] is True
