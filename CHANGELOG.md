@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-22
+
+### Changed
+- **DatalabOCR**: migrated from the deprecated `/marker` endpoint to the new
+  `/convert` endpoint (`POST https://www.datalab.to/api/v1/convert`). The submit
+  → poll → markdown flow is unchanged.
+
+### Removed
+- **DatalabOCR**: removed the `model` parameter (and `VALID_MODELS`). The convert
+  API no longer accepts a model; Datalab selects the underlying model from the
+  `mode` (`fast` / `balanced` / `accurate`). `OCRResult.model` is now reported as
+  `"datalab"`.
+
 ## [0.4.0] - 2026-06-15
 
 ### Added
