@@ -111,13 +111,14 @@ class BaseChunker(ABC):
                     # Merge current with the next chunk
                     current_chunk.text += (" " + chunks[i + 1].text)
 
-                    # Merge images if they exist
-                    if (
-                        current_chunk.metadata.images
-                        and chunks[i + 1].metadata.images
-                    ):
-                        current_chunk.metadata.images.extend(
-                            chunks[i + 1].metadata.images
+                    # Carry over the absorbed chunk's images. This must run
+                    # whenever the next chunk has images, even if the surviving
+                    # chunk had none — otherwise images whose markers now live
+                    # in this chunk's text would be dropped.
+                    if chunks[i + 1].metadata.images:
+                        current_chunk.metadata.images = (
+                            (current_chunk.metadata.images or [])
+                            + chunks[i + 1].metadata.images
                         )
 
                     # We've used chunk i+1, so skip it
@@ -132,13 +133,12 @@ class BaseChunker(ABC):
                         # Merge current chunk into the last chunk in 'merged'
                         merged[-1].text += (" " + current_chunk.text)
 
-                        # Merge images if they exist
-                        if (
-                            merged[-1].metadata.images
-                            and current_chunk.metadata.images
-                        ):
-                            merged[-1].metadata.images.extend(
-                                current_chunk.metadata.images
+                        # Carry over the absorbed chunk's images even if the
+                        # surviving chunk had none (see note above).
+                        if current_chunk.metadata.images:
+                            merged[-1].metadata.images = (
+                                (merged[-1].metadata.images or [])
+                                + current_chunk.metadata.images
                             )
                     else:
                         # If there's no previous chunk in 'merged', just add it

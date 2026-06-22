@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-22
+
+### Fixed
+- **Chunkers**: `BaseChunker.merge_small_chunks` dropped a chunk's
+  `metadata.images` when it was merged into a neighbour that had no images (it
+  only carried images over when *both* chunks already had some). Image markers
+  ended up in the merged text with no associated images, so downstream image
+  links were never created. Now the absorbed chunk's images are always carried
+  over. Mainly affected the Semantic/Sentence/RecursiveMarkdown chunkers (whose
+  small chunks merge often); FixedSize was usually spared because its larger
+  chunks rarely merge.
+
 ## [0.5.0] - 2026-06-22
 
 ### Changed
@@ -145,7 +157,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Note**: Versions 0.1.0 and 0.1.1 were initial setup releases. Version 0.1.2 is the first production-ready release with comprehensive test coverage.
 
-[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/MartimChaves/ragbandit-core/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/MartimChaves/ragbandit-core/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/MartimChaves/ragbandit-core/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/MartimChaves/ragbandit-core/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/MartimChaves/ragbandit-core/compare/v0.2.4...v0.2.5
