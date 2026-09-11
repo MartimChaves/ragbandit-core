@@ -2347,7 +2347,7 @@ wheels = [
 
 [[package]]
 name = "ragbandit-core"
-version = "0.2.6"
+version = "0.5.2"
 source = { editable = "." }
 dependencies = [
     { name = "cohere" },

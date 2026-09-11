@@ -17,7 +17,9 @@ class MistralOCR(BaseOCR):
 
     # Valid model names for Mistral OCR
     VALID_MODELS = [
-        "mistral-ocr-2512",  # "mistral-ocr-3, aka mistral-ocr-latest",
+        "mistral-ocr-2512",  # Mistral OCR 3
+        "mistral-ocr-4-0",  # Mistral OCR 4.0
+        "mistral-ocr-4-1",  # Mistral OCR 4.1
     ]
 
     def __init__(
