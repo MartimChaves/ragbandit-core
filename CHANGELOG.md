@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-11
+
+### Added
+- **MistralOCR**: added support for `mistral-ocr-4-0` and
+  `mistral-ocr-4-1`. OCR 3 (`mistral-ocr-2512`) remains the default.
+
+### Changed
+- **MistralOCR pricing**: added the OCR 4.0 and 4.1 API price of $4 per
+  1,000 pages while retaining OCR 3's $2 per 1,000 pages price.
+
 ## [0.5.1] - 2026-06-22
 
 ### Fixed

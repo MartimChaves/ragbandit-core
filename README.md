@@ -175,7 +175,7 @@ embedding_result = openai_embedder.embed_chunks(chunk_result)
 
 | Class | Provider | Models | Key params |
 |-------|----------|--------|------------|
-| `MistralOCR` | Mistral | `mistral-ocr-2512` (default) | `api_key`, `model` |
+| `MistralOCR` | Mistral | `mistral-ocr-2512` (default), `mistral-ocr-4-0`, `mistral-ocr-4-1` | `api_key`, `model` |
 | `DatalabOCR` | Datalab | `marker` | `api_key`, `mode` (`fast` / `balanced` / `accurate`), `max_pages`, `page_range` |
 
 ### Refiners

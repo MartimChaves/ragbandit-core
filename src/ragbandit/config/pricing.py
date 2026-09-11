@@ -36,6 +36,8 @@ EMBEDDING_COSTS = {
 OCR_MODEL_COSTS = {
     # Format: "model_name": cost_per_page
     "mistral-ocr-2512": 0.002,  # $2 per 1000 pages (Mistral OCR 3)
+    "mistral-ocr-4-0": 0.004,  # $4 per 1000 pages (Mistral OCR 4.0)
+    "mistral-ocr-4-1": 0.004,  # $4 per 1000 pages (Mistral OCR 4.1)
 }
 
 # Default OCR model to use if the specified model is not in OCR_MODEL_COSTS
